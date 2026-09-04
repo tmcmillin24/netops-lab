@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WS01 Status</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 30px;
+      background: #f4f4f4;
+      color: #222;
+      font-family: Arial, sans-serif;
+    }
+
+    .workstation-card {
+      max-width: 760px;
+      margin: auto;
+      padding: 24px;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+    }
+
+    .device-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0 0 5px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 17px;
+    }
+
+    .device-type,
+    .subtle {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .status {
+      margin: 4px 0 0;
+      color: #237a43;
+      font-size: 18px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .event {
+      margin-top: 22px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #eef4ff;
+      color: #315b9a;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .event.success {
+      background: #e9f7ef;
+      color: #237a43;
+    }
+
+    .event.error {
+      background: #fdecea;
+      color: #b42318;
+    }
+
+    .section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      background: #fafafa;
+    }
+
+    .stat-label {
+      margin-bottom: 7px;
+      color: #666;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+
+    .printer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 16px;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      background: #fafafa;
+    }
+
+    .printer-name {
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    button {
+      padding: 10px 15px;
+      border: 0;
+      border-radius: 8px;
+      background: #3578e5;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: #2868ca;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    details {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #666;
+      font-weight: bold;
+    }
+
+    .lab-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .danger {
+      background: #b42318;
+    }
+
+    .restore {
+      background: #237a43;
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 14px;
+      }
+
+      .workstation-card {
+        padding: 18px;
+      }
+
+      .device-header,
+      .printer-row {
+        display: block;
+      }
+
+      .status {
+        margin-top: 12px;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .printer-row button {
+        width: 100%;
+        margin-top: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="workstation-card">
+    <div class="device-header">
+      <div>
+        <h1 id="deviceName">WS01</h1>
+        <p id="deviceType" class="device-type">Linux Workstation</p>
+      </div>
+      <p id="status" class="status">Loading...</p>
+    </div>
+
+    <div id="event" class="event">
+      Workstation initialized. Waiting for activity.
+    </div>
+
+    <section class="section">
+      <h2>Network Interface</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">Interface</div>
+          <div id="interface" class="stat-value">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">IPv4 Address</div>
+          <div id="ipAddress" class="stat-value">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">MAC Address</div>
+          <div id="macAddress" class="stat-value">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Uptime</div>
+          <div id="uptime" class="stat-value">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Connected Switch</div>
+          <div id="connectedSwitch" class="stat-value">--</div>
+        </div>
+      </div>
+    </section>
+
+    <details>
+      <summary>Lab Controls — Fault Injection</summary>
+      <div class="lab-actions">
+        <button id="offlineButton" class="danger" onclick="setWorkstationState('offline')">
+          Simulate Workstation Offline
+        </button>
+        <button id="onlineButton" class="restore" onclick="setWorkstationState('online')">
+          Restore Workstation
+        </button>
+      </div>
+    </details>
+
+    <section class="section">
+      <h2>Traffic Statistics</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">Received</div>
+          <div id="received" class="stat-value">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Transmitted</div>
+          <div id="transmitted" class="stat-value">--</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Configured Printer</h2>
+      <div class="printer-row">
+        <div>
+          <div id="printerName" class="printer-name">Configured printer</div>
+          <p id="printerStatus" class="subtle">
+            Checking printer connection...
+          </p>
+        </div>
+        <button id="printButton" onclick="submitPrintJob()" disabled>
+          Print Test Page
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function formatBytes(bytes) {
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unit = 0;
+
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+      }
+
+      return value.toFixed(unit === 0 ? 0 : 1) + " " + units[unit];
+    }
+
+    function formatUptime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return hours + "h " + minutes + "m";
+    }
+
+    function updateStatus(data) {
+      const interfaceStatus = data.interface_state.toUpperCase();
+      const printer = data.printer;
+      const printButton = document.getElementById("printButton");
+      const statusElement = document.getElementById("status");
+
+      statusElement.textContent =
+        "● " + data.status.toUpperCase();
+      statusElement.style.color = data.status === "online" ? "#237a43" : "#b42318";
+      document.getElementById("event").textContent = data.last_event;
+      document.getElementById("event").className = "event " + data.last_event_type;
+      document.getElementById("offlineButton").disabled = data.status === "offline";
+      document.getElementById("onlineButton").disabled = data.status === "online";
+      document.getElementById("deviceName").textContent = data.name;
+      document.title = data.name + " Status";
+      document.getElementById("deviceType").textContent =
+        "Linux Workstation · " + data.ip_address;
+      document.getElementById("interface").textContent =
+        data.interface + " · " + interfaceStatus;
+      document.getElementById("ipAddress").textContent =
+        data.ip_address + "/24";
+      document.getElementById("macAddress").textContent =
+        data.mac_address;
+      document.getElementById("uptime").textContent =
+        formatUptime(data.uptime_seconds);
+      document.getElementById("connectedSwitch").textContent =
+        data.connected_switch;
+      document.getElementById("received").textContent =
+        formatBytes(data.network.rx_bytes) +
+        " · " + data.network.rx_packets + " packets";
+      document.getElementById("transmitted").textContent =
+        formatBytes(data.network.tx_bytes) +
+        " · " + data.network.tx_packets + " packets";
+
+      if (printer.reachable) {
+        document.getElementById("printerName").textContent =
+          printer.name;
+        document.getElementById("printerStatus").textContent =
+          printer.status.toUpperCase() +
+          " · " + printer.queue + " queued jobs";
+        printButton.disabled = data.status === "offline" || printer.status !== "ready";
+      }
+      else {
+        document.getElementById("printerName").textContent =
+          printer.name;
+        document.getElementById("printerStatus").textContent =
+          "UNREACHABLE · Check network or printer service";
+        printButton.disabled = true;
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const response = await fetch("/status");
+        const data = await response.json();
+        updateStatus(data);
+      }
+      catch (error) {
+        document.getElementById("status").textContent = "● UNREACHABLE";
+        document.getElementById("status").style.color = "#b42318";
+      }
+    }
+
+    async function submitPrintJob() {
+      const button = document.getElementById("printButton");
+      const event = document.getElementById("event");
+
+      button.disabled = true;
+      button.textContent = "Sending...";
+
+      try {
+        const response = await fetch("/print-jobs", {method: "POST"});
+        const data = await response.json();
+
+        event.textContent = data.message;
+        event.className = data.success ? "event success" : "event error";
+      }
+      catch (error) {
+        event.textContent = "Unable to communicate with this workstation.";
+        event.className = "event error";
+      }
+      finally {
+        button.textContent = "Print Test Page";
+        await loadStatus();
+      }
+    }
+
+    async function setWorkstationState(state) {
+      const event = document.getElementById("event");
+      try {
+        const response = await fetch("/state/" + state, {method: "POST"});
+        const data = await response.json();
+        updateStatus(data);
+      }
+      catch (error) {
+        event.textContent = "Unable to change workstation state.";
+        event.className = "event error";
+      }
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 3000);
+  </script>
+</body>
+</html>

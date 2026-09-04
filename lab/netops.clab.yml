@@ -2,22 +2,192 @@ name: netops
 
 topology:
   nodes:
+    rtr01:
+      kind: linux
+      image: netops-network:phase2
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - ip addr add 10.10.254.1/30 dev eth1
+        - ip route add 10.10.10.0/24 via 10.10.254.2 dev eth1
+        - ip route add 10.10.20.0/24 via 10.10.254.2 dev eth1
+        - ip route add 10.10.30.0/24 via 10.10.254.2 dev eth1
+
+    core01:
+      kind: linux
+      image: netops-network:phase2
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - ip addr add 10.10.254.2/30 dev eth1
+        - ip addr add 10.10.10.1/24 dev eth2
+        - ip addr add 10.10.20.1/24 dev eth3
+        - ip addr add 10.10.30.1/24 dev eth4
+
+    sw01:
+      kind: linux
+      image: netops-network:phase2
+      exec:
+        - ip link add br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0
+        - ip link set eth2 master br0
+        - ip link set eth3 master br0
+        - ip link set eth4 master br0
+        - ip link set eth5 master br0
+
+    sw02:
+      kind: linux
+      image: netops-network:phase2
+      exec:
+        - ip link add br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0
+        - ip link set eth2 master br0
+        - ip link set eth3 master br0
+        - ip link set eth4 master br0
+        - ip link set eth5 master br0
+
+    sw03:
+      kind: linux
+      image: netops-network:phase2
+      exec:
+        - ip link add br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0
+        - ip link set eth2 master br0
+        - ip link set eth3 master br0
+        - ip link set eth4 master br0
+        - ip link set eth5 master br0
+
     ws01:
       kind: linux
-      image: alpine:latest
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS01
+      ports:
+        - "8081:8081"
       exec:
         - ip addr add 10.10.10.11/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.10.1 dev eth1
+
+    ws02:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS02
+      exec:
+        - ip addr add 10.10.10.12/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.10.1 dev eth1
+
+    ws03:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS03
+      exec:
+        - ip addr add 10.10.10.13/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.10.1 dev eth1
+
+    ws04:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS04
+      exec:
+        - ip addr add 10.10.20.11/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.20.1 dev eth1
+
+    ws05:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS05
+      exec:
+        - ip addr add 10.10.20.12/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.20.1 dev eth1
+
+    ws06:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS06
+      exec:
+        - ip addr add 10.10.20.13/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.20.1 dev eth1
+
+    ws07:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS07
+      exec:
+        - ip addr add 10.10.30.11/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.30.1 dev eth1
+
+    ws08:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS08
+      exec:
+        - ip addr add 10.10.30.12/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.30.1 dev eth1
+
+    ws09:
+      kind: linux
+      image: netops-workstation:phase3
+      env:
+        DEVICE_NAME: WS09
+      exec:
+        - ip addr add 10.10.30.13/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.30.1 dev eth1
 
     prnt01:
       kind: linux
-      image: alpine:latest
-      binds:
-        - /Users/tristanmcmillin/Desktop/small-office-lab/containers/printer:/printer
+      image: netops-printer:phase3
+      env:
+        DEVICE_NAME: PRNT01
       ports:
         - "8080:8080"
-      cmd: sh -c "apk add --no-cache python3 && python3 /printer/printer_api.py"
       exec:
         - ip addr add 10.10.10.21/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.10.1 dev eth1
+
+    prnt02:
+      kind: linux
+      image: netops-printer:phase3
+      env:
+        DEVICE_NAME: PRNT02
+      ports:
+        - "8082:8080"
+      exec:
+        - ip addr add 10.10.20.21/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.20.1 dev eth1
+
+    prnt03:
+      kind: linux
+      image: netops-printer:phase3
+      env:
+        DEVICE_NAME: PRNT03
+      ports:
+        - "8083:8080"
+      exec:
+        - ip addr add 10.10.30.21/24 dev eth1
+        - ip route add 10.10.0.0/16 via 10.10.30.1 dev eth1
 
   links:
-    - endpoints: ["ws01:eth1", "prnt01:eth1"]
+    - endpoints: ["rtr01:eth1", "core01:eth1"]
+    - endpoints: ["core01:eth2", "sw01:eth1"]
+    - endpoints: ["core01:eth3", "sw02:eth1"]
+    - endpoints: ["core01:eth4", "sw03:eth1"]
+    - endpoints: ["sw01:eth2", "ws01:eth1"]
+    - endpoints: ["sw01:eth3", "ws02:eth1"]
+    - endpoints: ["sw01:eth4", "ws03:eth1"]
+    - endpoints: ["sw01:eth5", "prnt01:eth1"]
+    - endpoints: ["sw02:eth2", "ws04:eth1"]
+    - endpoints: ["sw02:eth3", "ws05:eth1"]
+    - endpoints: ["sw02:eth4", "ws06:eth1"]
+    - endpoints: ["sw02:eth5", "prnt02:eth1"]
+    - endpoints: ["sw03:eth2", "ws07:eth1"]
+    - endpoints: ["sw03:eth3", "ws08:eth1"]
+    - endpoints: ["sw03:eth4", "ws09:eth1"]
+    - endpoints: ["sw03:eth5", "prnt03:eth1"]

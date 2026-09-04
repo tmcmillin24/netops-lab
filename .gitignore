@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Containerlab runtime output belongs in Linux-local storage.
+lab/clab-*/
+clab-*/
+
+# Local editor and environment files.
+.env
+.vscode/
+.idea/

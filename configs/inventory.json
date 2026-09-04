@@ -1,0 +1,236 @@
+{
+  "site": {
+    "id": "office01",
+    "name": "NetOps Lab Small Office",
+    "domain": "office.test"
+  },
+  "networks": [
+    {
+      "id": "access_01",
+      "name": "Access Network 1",
+      "cidr": "10.10.10.0/24",
+      "gateway": "10.10.10.1",
+      "phase": "current"
+    },
+    {
+      "id": "access_02",
+      "name": "Access Network 2",
+      "cidr": "10.10.20.0/24",
+      "gateway": "10.10.20.1",
+      "phase": "current"
+    },
+    {
+      "id": "access_03",
+      "name": "Access Network 3",
+      "cidr": "10.10.30.0/24",
+      "gateway": "10.10.30.1",
+      "phase": "current"
+    },
+    {
+      "id": "services",
+      "name": "Infrastructure Services",
+      "cidr": "10.10.40.0/24",
+      "gateway": "10.10.40.1",
+      "phase": "planned"
+    },
+    {
+      "id": "core_transit",
+      "name": "Router to Core Transit",
+      "cidr": "10.10.254.0/30",
+      "gateway": null,
+      "phase": "current"
+    }
+  ],
+  "devices": [
+    {
+      "id": "rtr01",
+      "hostname": "RTR01",
+      "type": "router_firewall",
+      "ip_address": "10.10.254.1",
+      "network": "core_transit",
+      "connected_to": "CORE01",
+      "phase": "current"
+    },
+    {
+      "id": "core01",
+      "hostname": "CORE01",
+      "type": "layer3_core_switch",
+      "ip_address": "10.10.254.2",
+      "network": "core_transit",
+      "connected_to": "RTR01",
+      "interfaces": [
+        {"network": "core_transit", "ip_address": "10.10.254.2"},
+        {"network": "access_01", "ip_address": "10.10.10.1"},
+        {"network": "access_02", "ip_address": "10.10.20.1"},
+        {"network": "access_03", "ip_address": "10.10.30.1"}
+      ],
+      "phase": "current"
+    },
+    {
+      "id": "sw01",
+      "hostname": "SW01",
+      "type": "access_switch",
+      "ip_address": null,
+      "network": "access_01",
+      "connected_to": "CORE01",
+      "phase": "current"
+    },
+    {
+      "id": "sw02",
+      "hostname": "SW02",
+      "type": "access_switch",
+      "ip_address": null,
+      "network": "access_02",
+      "connected_to": "CORE01",
+      "phase": "current"
+    },
+    {
+      "id": "sw03",
+      "hostname": "SW03",
+      "type": "access_switch",
+      "ip_address": null,
+      "network": "access_03",
+      "connected_to": "CORE01",
+      "phase": "current"
+    },
+    {
+      "id": "ws01",
+      "hostname": "WS01",
+      "type": "workstation",
+      "ip_address": "10.10.10.11",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "assigned_printer": "PRNT01",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws02",
+      "hostname": "WS02",
+      "type": "workstation",
+      "ip_address": "10.10.10.12",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "assigned_printer": "PRNT01",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws03",
+      "hostname": "WS03",
+      "type": "workstation",
+      "ip_address": "10.10.10.13",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "assigned_printer": "PRNT01",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws04",
+      "hostname": "WS04",
+      "type": "workstation",
+      "ip_address": "10.10.20.11",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "assigned_printer": "PRNT02",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws05",
+      "hostname": "WS05",
+      "type": "workstation",
+      "ip_address": "10.10.20.12",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "assigned_printer": "PRNT02",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws06",
+      "hostname": "WS06",
+      "type": "workstation",
+      "ip_address": "10.10.20.13",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "assigned_printer": "PRNT02",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws07",
+      "hostname": "WS07",
+      "type": "workstation",
+      "ip_address": "10.10.30.11",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "assigned_printer": "PRNT03",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws08",
+      "hostname": "WS08",
+      "type": "workstation",
+      "ip_address": "10.10.30.12",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "assigned_printer": "PRNT03",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ws09",
+      "hostname": "WS09",
+      "type": "workstation",
+      "ip_address": "10.10.30.13",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "assigned_printer": "PRNT03",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "prnt01",
+      "hostname": "PRNT01",
+      "type": "printer",
+      "ip_address": "10.10.10.21",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "service_port": 8080,
+      "phase": "current"
+    },
+    {
+      "id": "prnt02",
+      "hostname": "PRNT02",
+      "type": "printer",
+      "ip_address": "10.10.20.21",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "service_port": 8080,
+      "phase": "current"
+    },
+    {
+      "id": "prnt03",
+      "hostname": "PRNT03",
+      "type": "printer",
+      "ip_address": "10.10.30.21",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "service_port": 8080,
+      "phase": "current"
+    },
+    {
+      "id": "api01",
+      "hostname": "API01",
+      "type": "application_server",
+      "ip_address": "10.10.40.10",
+      "network": "services",
+      "connected_to": "CORE01",
+      "service_port": 8000,
+      "phase": "planned"
+    }
+  ]
+}

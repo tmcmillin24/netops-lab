@@ -14,7 +14,7 @@
     }
 
     .printer-card {
-      max-width: 620px;
+      max-width: 760px;
       margin: auto;
       background: white;
       padding: 24px;
@@ -22,10 +22,28 @@
       box-shadow: 0 4px 14px rgba(0,0,0,0.1);
     }
 
+    .device-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .device-header h1 {
+      margin: 0 0 5px;
+    }
+
+    .device-type {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+
     .status {
       font-weight: bold;
       font-size: 18px;
-      margin-bottom: 6px;
+      margin: 4px 0 0;
+      white-space: nowrap;
     }
 
     .message {
@@ -35,7 +53,7 @@
     }
 
     .event {
-      margin-top: 18px;
+      margin-top: 22px;
       padding: 12px;
       border-radius: 8px;
       font-weight: bold;
@@ -65,8 +83,35 @@
       margin: 14px 0;
     }
 
-    .resource-info {
-      text-align: right;
+    .device-details {
+      margin-top: 22px;
+      padding-top: 4px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .resource-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .resource-card {
+      padding: 16px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .resource-label {
+      color: #555;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .resource-value {
+      font-size: 20px;
+      font-weight: bold;
     }
 
     .level {
@@ -149,10 +194,54 @@
     }
 
     .buttons {
-      margin-top: 24px;
+      margin-top: 14px;
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+    }
+
+    .recovery-actions {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #f0c36d;
+      border-radius: 8px;
+      background: #fff8e8;
+    }
+
+    .recovery-actions.visible {
+      display: block;
+    }
+
+    .recovery-actions p {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .lab-controls {
+      margin-top: 24px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .lab-controls summary {
+      padding: 13px 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .lab-controls-content {
+      padding: 0 14px 14px;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .lab-note {
+      margin: 12px 0 0;
+      color: #666;
+      font-size: 13px;
+      line-height: 1.45;
     }
 
     button.action {
@@ -173,14 +262,36 @@
       color: white;
     }
 
-    .blue-btn {
-      background: #3578e5;
-      color: white;
-    }
-
     .gray-btn {
       background: #666;
       color: white;
+    }
+
+    button.action:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 14px;
+      }
+
+      .printer-card {
+        padding: 18px;
+      }
+
+      .device-header {
+        display: block;
+      }
+
+      .status {
+        margin-top: 12px;
+      }
+
+      .resource-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -189,52 +300,62 @@
 
   <div class="printer-card">
 
-    <h1>PRNT01</h1>
+    <div class="device-header">
+      <div>
+        <h1 id="deviceName">PRNT01</h1>
+        <p id="deviceType" class="device-type">
+          Network Printer
+        </p>
+      </div>
 
-    <p id="status" class="status">
-      Loading...
-    </p>
+      <p id="status" class="status">
+        Loading...
+      </p>
+    </div>
 
     <p id="message" class="message">
       Checking printer...
     </p>
 
-    <hr>
-
-    <div class="row">
-      <span>IP Address</span>
-      <span>10.10.10.21</span>
+    <div id="event" class="event info">
+      Waiting for activity...
     </div>
 
-    <div class="row">
-      <span>Paper</span>
-
-      <div class="resource-info">
-        <div id="paper">--</div>
+    <div class="resource-grid">
+      <div class="resource-card">
+        <div class="resource-label">Paper Tray</div>
+        <div id="paper" class="resource-value">--</div>
         <div id="paperLevel" class="level">
           --
         </div>
       </div>
-    </div>
 
-    <div class="row">
-      <span>Toner</span>
-
-      <div class="resource-info">
-        <div id="toner">--</div>
+      <div class="resource-card">
+        <div class="resource-label">Black Toner</div>
+        <div id="toner" class="resource-value">--</div>
         <div id="tonerLevel" class="level">
           --
         </div>
       </div>
     </div>
 
-    <div class="row">
-      <span>Print Queue</span>
-      <span id="queue">--</span>
-    </div>
+    <div id="recoveryActions" class="recovery-actions">
+      <p>Service required</p>
+      <div class="buttons">
+        <button
+          id="refillPaperAction"
+          class="action green-btn"
+          onclick="runAction('/paper/refill')">
+          Refill Paper Tray
+        </button>
 
-    <div id="event" class="event info">
-      Waiting for activity...
+        <button
+          id="replaceTonerAction"
+          class="action gray-btn"
+          onclick="runAction('/toner/refill')">
+          Replace Toner
+        </button>
+      </div>
     </div>
 
     <div class="queue-section">
@@ -265,57 +386,51 @@
 
     </div>
 
-    <div class="buttons">
-
-      <button
-        class="action red-btn"
-        onclick="runAction('/status/offline')">
-        Set Offline
-      </button>
-
-      <button
-        class="action green-btn"
-        onclick="runAction('/status/ready')">
-        Set Ready
-      </button>
-
-      <button
-        class="action blue-btn"
-        onclick="runAction('/queue/add')">
-        Add Print Job
-      </button>
-
-      <button
-        class="action blue-btn"
-        onclick="runAction('/queue/complete')">
-        Complete Print Job
-      </button>
-
-      <button
-        class="action red-btn"
-        onclick="runAction('/paper/empty')">
-        Empty Paper
-      </button>
-
-      <button
-        class="action green-btn"
-        onclick="runAction('/paper/refill')">
-        Refill Paper
-      </button>
-
-      <button
-        class="action red-btn"
-        onclick="runAction('/toner/empty')">
-        Empty Toner
-      </button>
-
-      <button
-        class="action gray-btn"
-        onclick="runAction('/toner/refill')">
-        Refill Toner
-      </button>
-
+    <div class="device-details">
+      <div class="row">
+        <span>Office Network</span>
+        <span id="networkAddress">-- / eth1</span>
+      </div>
     </div>
+
+    <details class="lab-controls">
+      <summary>Lab Controls — Fault Injection</summary>
+
+      <div class="lab-controls-content">
+        <p class="lab-note">
+          These controls intentionally create and recover printer
+          faults for troubleshooting demonstrations.
+        </p>
+
+        <div class="buttons">
+          <button
+            id="disconnectAction"
+            class="action red-btn"
+          onclick="runAction('/state/offline')">
+            Simulate Printer Offline
+          </button>
+
+          <button
+            id="restoreAction"
+            class="action green-btn"
+          onclick="runAction('/state/ready')">
+            Restore Printer Service
+          </button>
+
+          <button
+            class="action red-btn"
+            onclick="runAction('/paper/empty')">
+            Simulate Empty Paper Tray
+          </button>
+
+          <button
+            class="action red-btn"
+            onclick="runAction('/toner/empty')">
+            Simulate Empty Toner
+          </button>
+        </div>
+      </div>
+    </details>
 
   </div>
 
@@ -423,9 +538,35 @@
       const eventElement =
         document.getElementById("event");
 
+      const recoveryActions =
+        document.getElementById("recoveryActions");
+
+      const refillPaperAction =
+        document.getElementById("refillPaperAction");
+
+      const replaceTonerAction =
+        document.getElementById("replaceTonerAction");
+
+      const disconnectAction =
+        document.getElementById("disconnectAction");
+
+      const restoreAction =
+        document.getElementById("restoreAction");
+
 
       statusElement.textContent =
         "● " + data.status.toUpperCase();
+
+      document.getElementById("deviceName").textContent =
+        data.name;
+
+      document.title = data.name + " Status";
+
+      document.getElementById("deviceType").textContent =
+        "Network Printer · " + data.ip_address;
+
+      document.getElementById("networkAddress").textContent =
+        data.ip_address + " / eth1";
 
 
       if (data.status === "ready") {
@@ -454,10 +595,6 @@
         data.toner + "%";
 
 
-      document.getElementById("queue").textContent =
-        data.queue + " jobs";
-
-
       paperLevelElement.textContent =
         data.paper_level.toUpperCase();
 
@@ -484,6 +621,27 @@
 
       eventElement.className =
         "event " + data.last_event_type;
+
+
+      const paperNeedsService = data.paper <= 0;
+      const tonerNeedsService = data.toner <= 0;
+
+      recoveryActions.classList.toggle(
+        "visible",
+        paperNeedsService || tonerNeedsService
+      );
+
+      refillPaperAction.style.display =
+        paperNeedsService ? "inline-block" : "none";
+
+      replaceTonerAction.style.display =
+        tonerNeedsService ? "inline-block" : "none";
+
+      disconnectAction.disabled =
+        data.status === "offline";
+
+      restoreAction.disabled =
+        data.status !== "offline";
 
 
       renderJobs(data.jobs);
@@ -519,7 +677,8 @@
           "red";
 
         messageElement.textContent =
-          "Unable to contact PRNT01.";
+          "Unable to contact " +
+          document.getElementById("deviceName").textContent + ".";
       }
     }
 
@@ -529,7 +688,7 @@
       try {
 
         const response =
-          await fetch(path);
+          await fetch(path, {method: "POST"});
 
         const data =
           await response.json();
@@ -544,7 +703,8 @@
           document.getElementById("event");
 
         eventElement.textContent =
-          "Unable to communicate with PRNT01.";
+          "Unable to communicate with " +
+          document.getElementById("deviceName").textContent + ".";
 
         eventElement.className =
           "event error";

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetOps Lab · Network Topology</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">OFFICE01 · INFRASTRUCTURE OPERATIONS</p>
+      <h1>Network Topology</h1>
+      <p class="subtitle">17 active lab devices across three routed access networks</p>
+    </div>
+    <div class="header-status"><span></span> Lab topology configured</div>
+  </header>
+
+  <main>
+    <section class="summary" aria-label="Topology summary">
+      <div><strong>17</strong><span>Devices</span></div>
+      <div><strong>3</strong><span>Access networks</span></div>
+      <div><strong>9</strong><span>Workstations</span></div>
+      <div><strong>3</strong><span>Printers</span></div>
+    </section>
+
+    <div class="workspace">
+      <section class="topology-panel">
+        <div class="legend">
+          <span><i class="dot live"></i>Live API</span>
+          <span><i class="dot configured"></i>Configured</span>
+          <span>Click any device for details</span>
+        </div>
+        <div id="topology" class="topology" aria-label="Office network topology"></div>
+      </section>
+
+      <aside id="inspector" class="inspector" aria-live="polite">
+        <div class="empty-inspector">
+          <div class="empty-icon">⌁</div>
+          <h2>Select a device</h2>
+          <p>Choose any node in the topology to inspect its identity, connection, and available live statistics.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div id="detailView" class="detail-view" aria-hidden="true">
+    <button class="close-detail" type="button" onclick="closeDetails()" aria-label="Close details">×</button>
+    <div id="detailContent" class="detail-content"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

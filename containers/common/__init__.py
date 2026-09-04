@@ -1,0 +1,1 @@
+"""Shared endpoint configuration helpers."""

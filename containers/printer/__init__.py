@@ -1,0 +1,1 @@
+"""Reusable simulated printer service."""

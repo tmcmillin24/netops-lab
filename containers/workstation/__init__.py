@@ -1,0 +1,1 @@
+"""Reusable simulated workstation service."""
