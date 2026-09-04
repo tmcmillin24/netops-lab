@@ -1,0 +1,23 @@
+name: netops
+
+topology:
+  nodes:
+    ws01:
+      kind: linux
+      image: alpine:latest
+      exec:
+        - ip addr add 10.10.10.11/24 dev eth1
+
+    prnt01:
+      kind: linux
+      image: alpine:latest
+      binds:
+        - /Users/tristanmcmillin/Desktop/small-office-lab/containers/printer:/printer
+      ports:
+        - "8080:8080"
+      cmd: sh -c "apk add --no-cache python3 && python3 /printer/printer_api.py"
+      exec:
+        - ip addr add 10.10.10.21/24 dev eth1
+
+  links:
+    - endpoints: ["ws01:eth1", "prnt01:eth1"]
