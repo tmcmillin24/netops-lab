@@ -2,7 +2,7 @@
   "site": {
     "id": "office01",
     "name": "NetOps Lab Small Office",
-    "domain": "office.test"
+    "domain": "netopslab.test"
   },
   "networks": [
     {
@@ -10,6 +10,8 @@
       "name": "Access Network 1",
       "cidr": "10.10.10.0/24",
       "gateway": "10.10.10.1",
+      "floor": "Floor 1",
+      "department": "Administration & Finance",
       "phase": "current"
     },
     {
@@ -17,6 +19,8 @@
       "name": "Access Network 2",
       "cidr": "10.10.20.0/24",
       "gateway": "10.10.20.1",
+      "floor": "Floor 2",
+      "department": "Operations & Support",
       "phase": "current"
     },
     {
@@ -24,6 +28,8 @@
       "name": "Access Network 3",
       "cidr": "10.10.30.0/24",
       "gateway": "10.10.30.1",
+      "floor": "Floor 3",
+      "department": "Engineering",
       "phase": "current"
     },
     {
@@ -31,7 +37,7 @@
       "name": "Infrastructure Services",
       "cidr": "10.10.40.0/24",
       "gateway": "10.10.40.1",
-      "phase": "planned"
+      "phase": "current"
     },
     {
       "id": "core_transit",
@@ -62,7 +68,8 @@
         {"network": "core_transit", "ip_address": "10.10.254.2"},
         {"network": "access_01", "ip_address": "10.10.10.1"},
         {"network": "access_02", "ip_address": "10.10.20.1"},
-        {"network": "access_03", "ip_address": "10.10.30.1"}
+        {"network": "access_03", "ip_address": "10.10.30.1"},
+        {"network": "services", "ip_address": "10.10.40.1"}
       ],
       "phase": "current"
     },
@@ -70,7 +77,7 @@
       "id": "sw01",
       "hostname": "SW01",
       "type": "access_switch",
-      "ip_address": null,
+      "ip_address": "10.10.10.2",
       "network": "access_01",
       "connected_to": "CORE01",
       "phase": "current"
@@ -79,7 +86,7 @@
       "id": "sw02",
       "hostname": "SW02",
       "type": "access_switch",
-      "ip_address": null,
+      "ip_address": "10.10.20.2",
       "network": "access_02",
       "connected_to": "CORE01",
       "phase": "current"
@@ -88,7 +95,7 @@
       "id": "sw03",
       "hostname": "SW03",
       "type": "access_switch",
-      "ip_address": null,
+      "ip_address": "10.10.30.2",
       "network": "access_03",
       "connected_to": "CORE01",
       "phase": "current"
@@ -101,7 +108,11 @@
       "network": "access_01",
       "connected_to": "SW01",
       "assigned_printer": "PRNT01",
+      "domain_joined": false,
+      "ad_computer_object": "WS01$",
+      "assigned_user": "jordan.lee",
       "service_port": 8081,
+      "host_port": 8081,
       "phase": "current"
     },
     {
@@ -112,6 +123,9 @@
       "network": "access_01",
       "connected_to": "SW01",
       "assigned_printer": "PRNT01",
+      "domain_joined": false,
+      "ad_computer_object": "WS02$",
+      "assigned_user": "riley.grant",
       "service_port": 8081,
       "phase": "current"
     },
@@ -123,6 +137,9 @@
       "network": "access_01",
       "connected_to": "SW01",
       "assigned_printer": "PRNT01",
+      "domain_joined": false,
+      "ad_computer_object": "WS03$",
+      "assigned_user": "sam.patel",
       "service_port": 8081,
       "phase": "current"
     },
@@ -134,6 +151,9 @@
       "network": "access_02",
       "connected_to": "SW02",
       "assigned_printer": "PRNT02",
+      "domain_joined": false,
+      "ad_computer_object": "WS04$",
+      "assigned_user": "casey.rivera",
       "service_port": 8081,
       "phase": "current"
     },
@@ -145,6 +165,9 @@
       "network": "access_02",
       "connected_to": "SW02",
       "assigned_printer": "PRNT02",
+      "domain_joined": false,
+      "ad_computer_object": "WS05$",
+      "assigned_user": "dana.flores",
       "service_port": 8081,
       "phase": "current"
     },
@@ -156,6 +179,9 @@
       "network": "access_02",
       "connected_to": "SW02",
       "assigned_printer": "PRNT02",
+      "domain_joined": false,
+      "ad_computer_object": "WS06$",
+      "assigned_user": "alex.kim",
       "service_port": 8081,
       "phase": "current"
     },
@@ -167,6 +193,9 @@
       "network": "access_03",
       "connected_to": "SW03",
       "assigned_printer": "PRNT03",
+      "domain_joined": false,
+      "ad_computer_object": "WS07$",
+      "assigned_user": "morgan.chen",
       "service_port": 8081,
       "phase": "current"
     },
@@ -178,6 +207,9 @@
       "network": "access_03",
       "connected_to": "SW03",
       "assigned_printer": "PRNT03",
+      "domain_joined": false,
+      "ad_computer_object": "WS08$",
+      "assigned_user": "jamie.wilson",
       "service_port": 8081,
       "phase": "current"
     },
@@ -189,6 +221,111 @@
       "network": "access_03",
       "connected_to": "SW03",
       "assigned_printer": "PRNT03",
+      "domain_joined": false,
+      "ad_computer_object": "WS09$",
+      "assigned_user": "avery.admin",
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp01",
+      "hostname": "LTP01",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.10.14",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "assigned_printer": "PRNT01",
+      "domain_joined": false,
+      "ad_computer_object": "LTP01$",
+      "assigned_user": "olivia.bennett",
+      "company_issued": true,
+      "remote": true,
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp02",
+      "hostname": "LTP02",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.10.15",
+      "network": "access_01",
+      "connected_to": "SW01",
+      "assigned_printer": "PRNT01",
+      "domain_joined": false,
+      "ad_computer_object": "LTP02$",
+      "assigned_user": "marcus.reed",
+      "company_issued": true,
+      "remote": true,
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp03",
+      "hostname": "LTP03",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.20.14",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "assigned_printer": "PRNT02",
+      "domain_joined": false,
+      "ad_computer_object": "LTP03$",
+      "assigned_user": "samantha.torres",
+      "company_issued": true,
+      "remote": true,
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp04",
+      "hostname": "LTP04",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.20.15",
+      "network": "access_02",
+      "connected_to": "SW02",
+      "assigned_printer": "PRNT02",
+      "domain_joined": false,
+      "ad_computer_object": "LTP04$",
+      "assigned_user": "daniel.brooks",
+      "company_issued": true,
+      "remote": true,
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp05",
+      "hostname": "LTP05",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.30.14",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "assigned_printer": "PRNT03",
+      "domain_joined": false,
+      "ad_computer_object": "LTP05$",
+      "assigned_user": "emily.chen",
+      "company_issued": true,
+      "remote": true,
+      "service_port": 8081,
+      "phase": "current"
+    },
+    {
+      "id": "ltp06",
+      "hostname": "LTP06",
+      "type": "workstation",
+      "form_factor": "laptop",
+      "ip_address": "10.10.30.15",
+      "network": "access_03",
+      "connected_to": "SW03",
+      "assigned_printer": "PRNT03",
+      "domain_joined": false,
+      "ad_computer_object": "LTP06$",
+      "assigned_user": "nathan.carter",
+      "company_issued": true,
+      "remote": true,
       "service_port": 8081,
       "phase": "current"
     },
@@ -200,6 +337,7 @@
       "network": "access_01",
       "connected_to": "SW01",
       "service_port": 8080,
+      "host_port": 8080,
       "phase": "current"
     },
     {
@@ -210,6 +348,7 @@
       "network": "access_02",
       "connected_to": "SW02",
       "service_port": 8080,
+      "host_port": 8082,
       "phase": "current"
     },
     {
@@ -220,13 +359,39 @@
       "network": "access_03",
       "connected_to": "SW03",
       "service_port": 8080,
+      "host_port": 8083,
+      "phase": "current"
+    },
+    {
+      "id": "dc01",
+      "hostname": "DC01",
+      "type": "domain_controller",
+      "platform": "Samba Active Directory Domain Controller",
+      "ip_address": "10.10.40.10",
+      "network": "services",
+      "connected_to": "CORE01",
+      "dns_domain": "netopslab.test",
+      "service_port": 53,
+      "phase": "current"
+    },
+    {
+      "id": "file01",
+      "hostname": "FILE01",
+      "type": "file_server",
+      "platform": "Samba file server",
+      "ip_address": "10.10.40.20",
+      "network": "services",
+      "connected_to": "CORE01",
+      "dns_domain": "netopslab.test",
+      "service_port": 8092,
+      "ad_computer_object": "FILE01$",
       "phase": "current"
     },
     {
       "id": "api01",
       "hostname": "API01",
       "type": "application_server",
-      "ip_address": "10.10.40.10",
+      "ip_address": "10.10.40.30",
       "network": "services",
       "connected_to": "CORE01",
       "service_port": 8000,

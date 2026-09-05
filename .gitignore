@@ -5,7 +5,9 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+.venvs/
 venv/
+*.log
 
 # Containerlab runtime output belongs in Linux-local storage.
 lab/clab-*/

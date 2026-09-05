@@ -6,6 +6,7 @@ COPY containers/__init__.py /app/containers/__init__.py
 COPY containers/common /app/containers/common
 COPY containers/workstation /app/containers/workstation
 COPY configs/inventory.json /config/inventory.json
+COPY configs/lab_extensions.json /config/lab_extensions.json
 
 ENV PYTHONPATH=/app
 ENV INVENTORY_PATH=/config/inventory.json

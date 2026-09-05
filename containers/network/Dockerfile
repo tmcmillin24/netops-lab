@@ -1,5 +1,5 @@
 FROM alpine:3.22
 
-RUN apk add --no-cache iproute2
+RUN apk add --no-cache iproute2 iptables
 
 CMD ["sleep", "infinity"]

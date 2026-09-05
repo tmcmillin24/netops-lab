@@ -1,0 +1,9 @@
+{
+  "shares": [
+    {"name": "Public", "read_groups": ["Employees"], "write_groups": ["Employees"]},
+    {"name": "HR", "read_groups": ["HR"], "write_groups": ["HR"]},
+    {"name": "Finance", "read_groups": ["Finance"], "write_groups": ["Finance"]},
+    {"name": "Engineering", "read_groups": ["Engineering"], "write_groups": ["Engineering"]},
+    {"name": "IT-Tools", "read_groups": ["Helpdesk", "IT-Admins"], "write_groups": ["IT-Admins"]}
+  ]
+}

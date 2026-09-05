@@ -16,8 +16,18 @@ docker build \
   "$repo_dir"
 
 docker build \
-  --tag netops-network:phase2 \
+  --tag netops-network:phase7 \
   --file "$repo_dir/containers/network/Dockerfile" \
   "$repo_dir"
 
-echo "Built Phase 3 endpoint images and the unchanged Phase 2 network image."
+docker build \
+  --tag netops-dc01:phase8 \
+  --file "$repo_dir/containers/domain-controller/Dockerfile" \
+  "$repo_dir"
+
+docker build \
+  --tag netops-file01:phase9 \
+  --file "$repo_dir/containers/file-server/Dockerfile" \
+  "$repo_dir"
+
+echo "Built endpoint, network, DC01, and Phase 9 FILE01 images."

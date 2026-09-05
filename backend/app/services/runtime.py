@@ -9,8 +9,10 @@ class DockerRuntime:
     container_prefix = "clab-netops-"
     network_interfaces = {
         "router_firewall": ("eth1",),
-        "layer3_core_switch": ("eth1", "eth2", "eth3", "eth4"),
+        "layer3_core_switch": ("eth1", "eth2", "eth3", "eth4", "eth5", "eth6", "br-services"),
         "access_switch": ("br0",),
+        "domain_controller": ("eth1",),
+        "file_server": ("eth1",),
     }
 
     def _container_name(self, device):
@@ -75,7 +77,9 @@ class DockerRuntime:
                 states[interface] = "unknown"
         required_interfaces = interfaces
         if device["type"] == "layer3_core_switch":
-            required_interfaces = ("eth2", "eth3", "eth4")
+            required_interfaces = tuple(
+                interface for interface in interfaces if interface not in {"eth1", "eth5", "eth6"}
+            )
         return {
             "interfaces": states,
             "operational": all(
@@ -111,7 +115,7 @@ class DockerRuntime:
             if result.returncode != 0:
                 raise LabServiceError(
                     "infrastructure_action_failed",
-                    result.stderr.strip() or f"Unable to set {device['hostname']} {desired}.",
+                    f"Unable to set {device['hostname']} {desired}.",
                     503,
                 )
         return self.network_state(device)
@@ -176,3 +180,106 @@ class DockerRuntime:
             ),
             "output": output,
         }
+
+    def traceroute(self, source_device, destination_device):
+        source_ip = source_device.get("ip_address")
+        destination_ip = destination_device.get("ip_address")
+        if not source_ip or not destination_ip:
+            raise LabServiceError(
+                "diagnostic_ip_missing",
+                "Traceroute requires known office-network source and destination IPs.",
+                422,
+            )
+        command = [
+            "docker", "exec", self._container_name(source_device),
+            "traceroute", "-n", "-m", "8", "-w", "1", "-q", "1", destination_ip,
+        ]
+        result = self._run_diagnostic(command, timeout=12)
+        output = (result.stdout or result.stderr).strip()
+        hops = [line.strip() for line in output.splitlines()[1:] if line.strip()]
+        success = any(destination_ip in hop and "*" not in hop for hop in hops)
+        return {
+            "diagnostic_type": "traceroute",
+            "source": source_device["hostname"],
+            "destination": destination_device["hostname"],
+            "destination_ip": destination_ip,
+            "success": success,
+            "message": (
+                f"Route to {destination_device['hostname']} completed."
+                if success else f"Route to {destination_device['hostname']} did not complete."
+            ),
+            "hops": hops,
+        }
+
+    def dns_lookup(self, source_device, destination_device):
+        lookup_name = self._container_name(destination_device)
+        command = [
+            "docker", "exec", self._container_name(source_device),
+            "nslookup", lookup_name,
+        ]
+        result = self._run_diagnostic(command, timeout=5)
+        output = (result.stdout or result.stderr).strip()
+        addresses = re.findall(r"^Address:\s+([^\s]+)", output, re.MULTILINE)
+        resolved = [address for address in addresses if not address.startswith("127.0.0.11")]
+        success = result.returncode == 0 and bool(resolved)
+        return {
+            "diagnostic_type": "dns",
+            "source": source_device["hostname"],
+            "destination": destination_device["hostname"],
+            "query": lookup_name,
+            "success": success,
+            "addresses": resolved,
+            "output": output,
+            "message": (
+                f"{lookup_name} resolved on the Containerlab management network."
+                if success else f"{lookup_name} could not be resolved."
+            ),
+        }
+
+    def network_info(self, device):
+        commands = {
+            "routes": ["docker", "exec", self._container_name(device), "ip", "route", "show"],
+            "neighbors": ["docker", "exec", self._container_name(device), "ip", "neigh", "show"],
+        }
+        data = {}
+        for key, command in commands.items():
+            result = self._run_diagnostic(command, timeout=3)
+            if result.returncode != 0:
+                raise LabServiceError(
+                    "diagnostic_failed",
+                    f"Network information is unavailable for {device['hostname']}.",
+                    503,
+                )
+            data[key] = [line for line in result.stdout.splitlines() if line.strip()]
+        return data
+
+    def dc_command(self, arguments, timeout=8):
+        command = ["docker", "exec", "clab-netops-dc01", *arguments]
+        try:
+            result = subprocess.run(
+                command, capture_output=True, check=False, text=True, timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise LabServiceError(
+                "directory_unavailable",
+                "DC01 could not complete the directory operation.",
+                503,
+            ) from error
+        if result.returncode != 0:
+            raise LabServiceError(
+                "directory_operation_failed",
+                "DC01 rejected the controlled directory operation.",
+                409,
+            )
+        return result.stdout
+
+    @staticmethod
+    def _run_diagnostic(command, timeout):
+        try:
+            return subprocess.run(
+                command, capture_output=True, check=False, text=True, timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise LabServiceError(
+                "diagnostic_failed", "The controlled diagnostic could not be executed.", 503,
+            ) from error

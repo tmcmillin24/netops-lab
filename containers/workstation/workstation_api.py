@@ -192,8 +192,11 @@ class WorkstationHandler(BaseHTTPRequestHandler):
 
 def main():
     try:
-        inventory = Inventory.load()
-        config = WorkstationConfig.from_inventory(inventory, os.getenv("DEVICE_NAME", "WS01"))
+        if os.getenv("DEVICE_DYNAMIC") == "true":
+            config = WorkstationConfig.from_environment()
+        else:
+            inventory = Inventory.load()
+            config = WorkstationConfig.from_inventory(inventory, os.getenv("DEVICE_NAME", "WS01"))
     except InventoryError as error:
         raise SystemExit(f"Workstation configuration error: {error}") from error
     WorkstationHandler.workstation = WorkstationState(config)

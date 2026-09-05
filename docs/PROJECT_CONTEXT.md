@@ -128,17 +128,31 @@ Current simulated infrastructure:
 - SW01-SW03 - Linux bridge access switches
 - WS01-WS09 - parameterized Linux workstation endpoints
 - PRNT01-PRNT03 - parameterized printer endpoints
+- DC01 - ARM64 Samba Active Directory domain controller and DNS service
+- FILE01 - ARM64 Samba file server and controlled file-service API
 
 Access layout:
 
-- SW01 / `10.10.10.0/24`: WS01-WS03 and PRNT01
-- SW02 / `10.10.20.0/24`: WS04-WS06 and PRNT02
-- SW03 / `10.10.30.0/24`: WS07-WS09 and PRNT03
+- Floor 1, Administration & Finance — SW01 / `10.10.10.0/24`: WS01-WS03 and PRNT01
+- Floor 2, Operations & Support — SW02 / `10.10.20.0/24`: WS04-WS06 and PRNT02
+- Floor 3, Engineering — SW03 / `10.10.30.0/24`: WS07-WS09 and PRNT03
+- Services — CORE01 services bridge / `10.10.40.0/24`: DC01 at `10.10.40.10` and FILE01 at `10.10.40.20`
 
 CORE01 provides the `.1` gateway on each access network. RTR01 and CORE01 use
 the `10.10.254.0/30` transit network. Endpoints retain their Containerlab
 management interface and use `eth1` for office traffic. Complete addressing is
 documented in `configs/IP_PLAN.md` and `configs/inventory.json`.
+SW01-SW03 expose management addresses at `10.10.10.2`, `10.10.20.2`, and
+`10.10.30.2` on their Linux bridges. This makes same-floor switch diagnostics
+real while keeping Containerlab management `eth0` separate and preserving the
+existing cross-floor forwarding policy.
+
+CORE01 enforces default-deny forwarding between the three floor networks.
+Same-floor endpoints retain local communication and assigned-printer access,
+and each floor can reach its CORE01 gateway, DC01, and RTR01. Direct cross-floor
+workstation and printer traffic is denied. Containerlab management traffic is
+separate from this office policy and remains available to the centralized
+backend for controlled monitoring and recovery.
 
 WS01 and PRNT01 remain published through Lima for direct macOS access:
 
@@ -191,7 +205,7 @@ PRNT01 currently has real in-memory state and interactive behavior.
 
 Workstations, printers, and network nodes run from the locally built
 ARM64-compatible images `netops-workstation:phase3`, `netops-printer:phase3`,
-and `netops-network:phase2`. Application files are copied into the endpoint
+and `netops-network:phase7`. Application files are copied into the endpoint
 images at build time; the topology does not depend on absolute macOS source
 bind paths.
 
@@ -415,8 +429,8 @@ A likely access-layer layout is:
 - 3 workstations
 - 1 printer
 
-The access switches connect to CORE01, and CORE01 connects to RTR01. The
-services network, servers, and VLAN tagging remain future work.
+The access switches and DC01 services segment connect to CORE01, and CORE01
+connects to RTR01. Additional servers and VLAN tagging remain future work.
 
 ## Planned Network Functionality
 
@@ -448,11 +462,12 @@ Possible user actions may include:
 
 ## Interactive Frontend
 
-The Phase 5 primary frontend is implemented under `frontend/` as a lightweight
+The primary frontend is implemented under `frontend/` as a lightweight
 vanilla HTML, CSS, and JavaScript operations console. It is served locally on
-port 8090 and uses only the centralized Phase 4 API on port 8000 for inventory,
-live state, device actions, print submission, and controlled ping. It refreshes
-the overview and device state every five seconds without reloading the page.
+port 8090 and uses only the centralized API on port 8000 for inventory, live
+state, device actions, print submission, and controlled diagnostics. It
+refreshes one combined overview/device response every five seconds without
+reloading the page.
 
 The primary navigation includes:
 
@@ -464,8 +479,8 @@ The primary navigation includes:
 - Automation
 - Architecture
 
-Dashboard, Network, Systems, and Architecture are live implemented pages.
-Active Directory, Tickets, and Automation are clearly marked Planned Phase and
+Dashboard, Network, Systems, Active Directory, and Architecture are live
+implemented pages. Tickets and Automation are clearly marked Planned Phase and
 do not display fabricated data.
 
 Devices are clickable in the topology and Systems tables.
@@ -487,9 +502,10 @@ Examples:
 Device drawers preserve selection during refresh and show only telemetry the
 backend actually provides. Printer and workstation controls call allowlisted
 central backend routes; the browser never invokes Docker or endpoint mutation
-routes directly. A simple known-device ping interface is present as preparation
-for Phase 6, while traceroute, DNS, ARP, and route diagnostics remain future
-work.
+routes directly. Phase 6 provides controlled ping, reachability, traceroute,
+and Containerlab-name DNS checks between inventory devices, plus read-only
+route and neighbor information. The backend constructs fixed argument lists
+for each diagnostic and accepts neither arbitrary targets nor command text.
 
 The frontend is a control and visualization layer over the actual lab.
 
@@ -544,15 +560,31 @@ access segment retains local switching. Disabling RTR01 removes upstream
 connectivity while internal office routing remains available. The frontend
 reports direct device state separately from dependency impact and exposes a
 restore action for every supported fault.
+Access-switch recovery enforces upstream ordering: SW01-SW03 restoration is
+rejected with a structured error while CORE01 is offline, directing the
+operator to restore CORE01 first. This prevents a local interface operation
+from being presented as full connectivity recovery.
 
 Active printer resource faults are returned in the lab overview as structured
 alerts. The dashboard lists the affected printer and exact reason, and both the
 alert and topology device open live device details and recovery controls.
+Printer alerts and dependency impacts open compact device lists in the frontend;
+individual device details retain a return path to the originating list.
 
-Network-device status currently represents Containerlab container availability;
-it is labeled with `status_source: container_runtime`. Endpoint status comes
-from the live device service. This distinction avoids presenting baseline
-container checks as richer device telemetry.
+The centralized backend also keeps a lightweight in-memory feed of up to 50
+recent endpoint, infrastructure, printer-health, and connectivity events. Each
+event includes a UTC timestamp, severity, device, event type, and message.
+Infrastructure events include affected downstream devices for both fault and
+recovery transitions; a successful test following a failed source/destination
+test records connectivity restoration. The dashboard displays the newest 15
+events in a fixed-height scrollable list. This history is intentionally
+ephemeral and resets whenever the backend process restarts.
+
+Network-device status uses the operational state of its known office-network
+interfaces and is labeled with `status_source: linux_interface_state`.
+Container availability is checked separately. Endpoint status comes from each
+live device service. This distinction avoids presenting a running container as
+a healthy office-network device.
 
 The public-facing version must not expose arbitrary shell execution.
 
@@ -580,48 +612,130 @@ Future systems administration components may include:
 - monitoring
 - administrative troubleshooting
 
-A Windows-based Active Directory environment will likely require a heavier VM than the lightweight Linux containers.
-
-Do not add it until the project reaches that phase.
-
 ## Active Directory Direction
 
-A future Active Directory environment may include a domain controller such as:
+Phase 8 implements DC01 as an ARM64-native Samba Active Directory Domain
+Controller. This is a real AD-compatible LDAP, Kerberos, DNS, account, group,
+SYSVOL, and password-policy service, but it is explicitly not Windows Server.
+Native Windows Server is impractical on the current M4 host without a separate
+licensed or emulated virtualization layer.
 
-`DC01`
+The lab-only domain is `netopslab.test` (`NETOPSLAB` NetBIOS) and DC01 uses
+`10.10.40.10`. The directory contains a small `OU=NetOpsLab` hierarchy with
+Users, Workstations, Laptops, Servers, Groups, and Admins OUs. Fifteen active
+fictional employees map one-to-one to WS01-WS09 and LTP01-LTP06. The six
+laptop users are company-issued remote users spanning HR, procurement,
+helpdesk, operations, and engineering roles. Three disabled former-employee
+accounts remain unassigned for realistic offboarding and audit scenarios.
 
-Potential AD-related interactions may include:
+Employees is the broad workforce group. Finance, Operations, and Engineering
+cover floor-aligned resources; HR, Procurement, and Helpdesk provide
+role-specific access; Remote-Users covers remote access; and
+Monitoring-Readers provides read-only monitoring access. The everyday
+`avery.admin` account is not privileged. The separate `avery.admin-adm`
+identity receives administrative access through IT-Admins, which is nested in
+Domain Admins. `svc_monitor` is a non-interactive service identity with only
+Monitoring-Readers membership.
 
-- creating users
-- disabling users
-- enabling users
-- resetting passwords
-- unlocking accounts
-- managing groups
-- inspecting group membership
-- demonstrating Group Policy
-- viewing domain health
-- troubleshooting DNS-related AD issues
+A compact summary and horizontal object tabs separate Users, Unassigned,
+Remote Users, Account Attention, Computers, Security Groups, and Disabled
+accounts without a persistent sidebar. Group members appear only after an
+operator selects a group. The Account Attention view deliberately begins with
+Alex Kim locked and Sam Patel requiring a password change so unlock and reset
+workflows can be practiced. These states and the displayed password policy are
+read from Samba rather than supplied as frontend-only values.
 
-These actions should eventually be exposed through controlled backend APIs rather than unrestricted administrator access.
+The backend exposes only allowlisted health, user lookup, enable/disable,
+password reset, unlock, and group-membership operations. It accepts no command
+text, LDAP filters, or arbitrary directory identities. Temporary reset
+passwords are generated at runtime, returned once, and not logged or committed.
+Directory health transitions and controlled account, membership, assignment,
+and provisioning operations are recorded in the central recent-event feed.
+
+The Linux workstation and laptop simulations remain non-domain-joined. Their inventory
+metadata links them conceptually to real AD computer objects and assigned users
+without claiming a fake live join. Future Windows clients will use DC01 as DNS
+and can join the domain to validate actual Group Policy application.
+
+The six current laptops are part of the repository baseline topology so the
+24-device environment is reproducible after a clean deployment. The Network
+page also supports additional controlled endpoint expansion. A
+non-disruptive draft selects a workstation (`WS##`) or laptop (`LTP##`) and one
+of the three known floors, proposes the next type-specific hostname and unused
+endpoint address, and derives the access switch and printer. The device is
+created unassigned. A separate
+Apply action persists runtime extensions in the Lima-local writable
+`$HOME/netops-lab-state/lab_extensions.json`, creates an allowlisted AD computer
+object, and writes `$HOME/netops-lab-state/netops.generated.clab.yml` from only
+the marked dynamic sections of the base Containerlab topology. It then rebuilds
+the endpoint image and redeploys the lab. The repository remains the declarative
+baseline instead of receiving runtime GUI writes. The UI warns about this
+interruption before applying. Access
+switches discover only office-facing `eth1` and higher ports; Containerlab
+management `eth0` remains outside the office bridge. Employee creation is a
+separate Active Directory workflow that lists workstations not held by an
+assigned account, creates the controlled Samba identity, applies the appropriate
+department group, and persists the new assignment. This allows an offboarded
+employee's existing workstation to be reassigned without adding another device.
+An explicit directory action releases an employee's device assignment without
+silently disabling the account. Only dynamically provisioned `WS##` and
+`LTP##` endpoints can be removed; baseline WS01-WS09 remain protected, and
+removal is rejected until the assigned employee has been unassigned. Successful
+removal regenerates and redeploys the topology and cleans up the corresponding
+AD computer object.
+New employee accounts may be created without an endpoint and always receive the
+baseline `Employees` group. Enabled users without a workstation appear in the
+Unassigned Members directory view. Assigning one of those users to an available
+endpoint derives the floor and department from the endpoint network and applies
+the matching Finance, Operations, or Engineering group. Unassignment removes
+that department group while retaining `Employees`. Background lab polling does
+not rebuild the Active Directory page, preserving table scroll position and
+the operator's current selection.
+
+Samba domain data, DNS, and SYSVOL persist in the Lima-local
+`$HOME/netops-lab-state/dc01` directory. DC01 alone runs non-privileged with
+NET_ADMIN, NET_RAW, and the explicitly approved SYS_ADMIN capability required
+to maintain Windows-compatible SYSVOL ACLs. This local-lab security exception
+must be reconsidered before public hosting.
 
 ## File Server Direction
 
-A future file server such as:
+Phase 9 implements FILE01 at `10.10.40.20` on the existing services network.
+CORE01 uses a small Linux services bridge to attach both DC01 and FILE01 while
+retaining the existing `10.10.40.1` gateway and floor-to-services policy.
+FILE01 uses an ARM64 Debian/Samba container, persists share contents under the
+Lima-local `$HOME/netops-lab-state/file01/shares` directory, and exports Public,
+HR, Finance, Engineering, and IT-Tools through a real `smbd` process.
 
-`FILE01`
+The safe backend authorization layer accepts only a known AD user, that user's
+assigned workstation or laptop, one configured share, and a read/write
+operation. It evaluates live DC01 group membership: Employees controls Public;
+HR, Finance, and Engineering control their matching shares; Helpdesk and
+IT-Admins can read IT-Tools; and only IT-Admins can write IT-Tools. This is a
+controlled authorization model rather than a literal domain-authenticated SMB
+mount from every Linux endpoint. The Samba service and exports are real, while
+DC01 remains the source of truth for authorization decisions.
 
-may demonstrate:
+Phase 9 supports constrained fault injection for FILE01 offline, SMB stopped,
+one disabled share, and one read-only share. Device outages affect aggregate
+online/offline counts; SMB and share problems leave FILE01 online but make file
+services unhealthy. Access denials and state transitions reuse the central
+event feed. The Systems page, topology, device drawer, share inventory, and
+controlled access checker expose this state without arbitrary paths or command
+execution.
 
-- SMB/Samba shares
-- user permissions
-- group permissions
-- access failures
-- troubleshooting
-- storage availability
-- service state
+Phase 10 will add the user-facing remediation controls for restoring FILE01,
+starting SMB, re-enabling shares, repairing access membership, and restoring
+write access. Phase 9 deliberately does not provide that repair UI.
 
-The goal is to demonstrate practical infrastructure administration rather than simply showing a file server icon.
+Phase 9.5 adds Manage Access to each FILE01 share without introducing direct
+share-user assignments. The drawer derives effective users from current DC01
+memberships, shows the read or read/write level contributed by each configured
+access group, and lists eligible users who do not yet receive access. Add and
+Remove actions call a FILE01-scoped backend route that permits only the groups
+configured for that share, then refreshes the FILE01 and Active Directory views.
+The authoritative relationship remains user → AD security group → share
+permission, and the existing event feed records each membership change.
 
 ## Ticketing and IT Operations Direction
 
@@ -759,6 +873,10 @@ dependency and avoids downloading packages during every deployment.
 
 Each development computer must build the local endpoint images before its first
 deployment and after endpoint source changes.
+
+Each computer provisions its own persistent DC01 state on first deployment.
+`scripts/lab.sh` creates the Lima-local state directory automatically; that
+state is intentionally not committed to Git.
 
 The repository itself is still mounted into Lima at a machine-specific macOS
 path, so the developer must change to the correct checkout directory before

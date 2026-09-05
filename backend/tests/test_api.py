@@ -8,6 +8,7 @@ def test_lab_overview(client):
     response = client.get("/api/lab")
     assert response.status_code == 200
     assert response.json()["total_devices"] == 17
+    assert {device["hostname"] for device in response.json()["devices"]} == {"PRNT01", "WS01"}
 
 
 def test_device_inventory_and_known_lookup(client):
@@ -72,3 +73,22 @@ def test_arbitrary_command_field_is_rejected(client):
     response = client.post("/api/connectivity/ping", json={"source": "WS01", "destination": "PRNT01", "command": "sh -c anything"})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
+
+
+def test_known_device_traceroute_and_dns_are_validated(client):
+    traceroute = client.post("/api/connectivity/diagnostic", json={"diagnostic_type": "traceroute", "source": "WS01", "destination": "PRNT01"})
+    dns = client.post("/api/connectivity/diagnostic", json={"diagnostic_type": "dns", "source": "WS01", "destination": "PRNT01"})
+    service_health = client.post("/api/connectivity/diagnostic", json={"diagnostic_type": "service-health", "source": "WS01", "destination": "PRNT01"})
+    unknown = client.post("/api/connectivity/diagnostic", json={"diagnostic_type": "traceroute", "source": "WS99", "destination": "PRNT01"})
+    command = client.post("/api/connectivity/diagnostic", json={"diagnostic_type": "ping", "source": "WS01", "destination": "PRNT01", "command": "sh"})
+    assert traceroute.status_code == dns.status_code == service_health.status_code == 200
+    assert unknown.status_code == 404
+    assert command.status_code == 422
+
+
+def test_network_info_and_recent_events(client):
+    info = client.get("/api/connectivity/network-info/WS01")
+    events = client.get("/api/connectivity/events")
+    assert info.status_code == events.status_code == 200
+    assert info.json()["routes"] == ["default via 10.10.10.1"]
+    assert events.json() == {"events": []}

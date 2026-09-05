@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 import threading
 
 
@@ -14,6 +15,17 @@ class WorkstationConfig:
     connected_switch: str
     printer_name: str
     printer_ip: str
+
+    @classmethod
+    def from_environment(cls):
+        return cls(
+            name=os.environ["DEVICE_NAME"],
+            ip_address=os.environ["DEVICE_IP"],
+            gateway=os.environ["DEVICE_GATEWAY"],
+            connected_switch=os.environ["DEVICE_SWITCH"],
+            printer_name=os.environ["DEVICE_PRINTER"],
+            printer_ip=os.environ["DEVICE_PRINTER_IP"],
+        )
 
     @classmethod
     def from_inventory(cls, inventory, device_name):

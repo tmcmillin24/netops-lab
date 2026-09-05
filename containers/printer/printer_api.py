@@ -40,7 +40,10 @@ class PrinterHandler(BaseHTTPRequestHandler):
     def read_json(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            return json.loads(self.rfile.read(length) or b"{}")
+            payload = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(payload, dict):
+                raise ValueError
+            return payload
         except (ValueError, json.JSONDecodeError) as error:
             raise PrinterOperationError("Request body must contain valid JSON.", 400, "invalid_json") from error
 

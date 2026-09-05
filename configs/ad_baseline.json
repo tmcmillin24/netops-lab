@@ -1,0 +1,61 @@
+{
+  "domain": {
+    "dns_name": "netopslab.test",
+    "netbios_name": "NETOPSLAB",
+    "domain_controller": "DC01",
+    "dns_address": "10.10.40.10"
+  },
+  "organizational_units": [
+    "NetOpsLab",
+    "Users,NetOpsLab",
+    "Workstations,NetOpsLab",
+    "Laptops,NetOpsLab",
+    "Servers,NetOpsLab",
+    "Groups,NetOpsLab",
+    "Admins,NetOpsLab"
+  ],
+  "groups": [
+    {"name": "Employees", "description": "All active office employees"},
+    {"name": "HR", "description": "Human Resources records and services"},
+    {"name": "Finance", "description": "Administration and finance resources"},
+    {"name": "Procurement", "description": "Procurement workflows and vendor resources"},
+    {"name": "Operations", "description": "Operations and support resources"},
+    {"name": "Helpdesk", "description": "Service desk tools and support resources"},
+    {"name": "Engineering", "description": "Engineering systems and project resources"},
+    {"name": "Remote-Users", "description": "Company-issued remote laptop users"},
+    {"name": "IT-Admins", "description": "Infrastructure administrators"},
+    {"name": "Monitoring-Readers", "description": "Read-only monitoring service identities"},
+    {"name": "Former-Employees", "description": "Disabled accounts retained for audit history"}
+  ],
+  "deprecated_groups": [
+    "Floor1-Administration",
+    "Floor2-Operations",
+    "Floor3-Engineering"
+  ],
+  "deprecated_users": [
+    "kim.jones",
+    "olivia.benett"
+  ],
+  "users": [
+    {"username": "jordan.lee", "display_name": "Jordan Lee", "given_name": "Jordan", "surname": "Lee", "role": "Finance Analyst", "department": "Administration & Finance", "floor": "Floor 1", "workstation": "WS01", "groups": ["Employees", "Finance"]},
+    {"username": "riley.grant", "display_name": "Riley Grant", "given_name": "Riley", "surname": "Grant", "role": "Office Manager", "department": "Administration & Finance", "floor": "Floor 1", "workstation": "WS02", "groups": ["Employees", "Finance"]},
+    {"username": "sam.patel", "display_name": "Sam Patel", "given_name": "Sam", "surname": "Patel", "role": "Payroll Specialist", "department": "Administration & Finance", "floor": "Floor 1", "workstation": "WS03", "groups": ["Employees", "Finance"], "password_expired": true},
+    {"username": "casey.rivera", "display_name": "Casey Rivera", "given_name": "Casey", "surname": "Rivera", "role": "Helpdesk Technician", "department": "Operations & Support", "floor": "Floor 2", "workstation": "WS04", "groups": ["Employees", "Operations", "Helpdesk"]},
+    {"username": "dana.flores", "display_name": "Dana Flores", "given_name": "Dana", "surname": "Flores", "role": "Operations Coordinator", "department": "Operations & Support", "floor": "Floor 2", "workstation": "WS05", "groups": ["Employees", "Operations"]},
+    {"username": "alex.kim", "display_name": "Alex Kim", "given_name": "Alex", "surname": "Kim", "role": "Support Analyst", "department": "Operations & Support", "floor": "Floor 2", "workstation": "WS06", "groups": ["Employees", "Operations", "Helpdesk"], "locked": true},
+    {"username": "morgan.chen", "display_name": "Morgan Chen", "given_name": "Morgan", "surname": "Chen", "role": "Systems Engineer", "department": "Engineering", "floor": "Floor 3", "workstation": "WS07", "groups": ["Employees", "Engineering"]},
+    {"username": "jamie.wilson", "display_name": "Jamie Wilson", "given_name": "Jamie", "surname": "Wilson", "role": "Network Engineer", "department": "Engineering", "floor": "Floor 3", "workstation": "WS08", "groups": ["Employees", "Engineering"]},
+    {"username": "avery.admin", "display_name": "Avery Admin", "given_name": "Avery", "surname": "Admin", "role": "Infrastructure Administrator", "department": "Engineering", "floor": "Floor 3", "workstation": "WS09", "groups": ["Employees", "Engineering"]},
+    {"username": "olivia.bennett", "display_name": "Olivia Bennett", "given_name": "Olivia", "surname": "Bennett", "role": "Human Resources Manager", "department": "Human Resources", "floor": "Floor 1", "workstation": "LTP01", "groups": ["Employees", "HR", "Remote-Users"], "remote": true},
+    {"username": "marcus.reed", "display_name": "Marcus Reed", "given_name": "Marcus", "surname": "Reed", "role": "Procurement Specialist", "department": "Procurement", "floor": "Floor 1", "workstation": "LTP02", "groups": ["Employees", "Procurement", "Remote-Users"], "remote": true},
+    {"username": "samantha.torres", "display_name": "Samantha Torres", "given_name": "Samantha", "surname": "Torres", "role": "IT Service Desk Lead", "department": "Helpdesk", "floor": "Floor 2", "workstation": "LTP03", "groups": ["Employees", "Helpdesk", "Remote-Users"], "remote": true},
+    {"username": "daniel.brooks", "display_name": "Daniel Brooks", "given_name": "Daniel", "surname": "Brooks", "role": "Business Operations Analyst", "department": "Operations & Support", "floor": "Floor 2", "workstation": "LTP04", "groups": ["Employees", "Operations", "Remote-Users"], "remote": true},
+    {"username": "emily.chen", "display_name": "Emily Chen", "given_name": "Emily", "surname": "Chen", "role": "Software Developer", "department": "Engineering", "floor": "Floor 3", "workstation": "LTP05", "groups": ["Employees", "Engineering", "Remote-Users"], "remote": true},
+    {"username": "nathan.carter", "display_name": "Nathan Carter", "given_name": "Nathan", "surname": "Carter", "role": "Cybersecurity Analyst", "department": "Engineering", "floor": "Floor 3", "workstation": "LTP06", "groups": ["Employees", "Engineering", "Remote-Users"], "remote": true},
+    {"username": "avery.admin-adm", "display_name": "Avery Admin (Privileged)", "given_name": "Avery", "surname": "Admin", "role": "Active Directory Administrator", "department": "IT Administration", "floor": "Services", "workstation": null, "groups": ["IT-Admins"], "account_type": "privileged_admin", "privileged": true, "ou": "Admins"},
+    {"username": "svc_monitor", "display_name": "Monitoring Service", "given_name": "Monitoring", "surname": "Service", "role": "Read-only Monitoring Service", "department": "IT Operations", "floor": "Services", "workstation": null, "groups": ["Monitoring-Readers"], "account_type": "service", "password_never_expires": true},
+    {"username": "taylor.brooks", "display_name": "Taylor Brooks", "given_name": "Taylor", "surname": "Brooks", "role": "Former Employee", "department": "Former Employees", "floor": "Unassigned", "workstation": null, "groups": ["Former-Employees"], "disabled": true},
+    {"username": "robin.hayes", "display_name": "Robin Hayes", "given_name": "Robin", "surname": "Hayes", "role": "Former Employee", "department": "Former Employees", "floor": "Unassigned", "workstation": null, "groups": ["Former-Employees"], "disabled": true},
+    {"username": "cameron.price", "display_name": "Cameron Price", "given_name": "Cameron", "surname": "Price", "role": "Former Employee", "department": "Former Employees", "floor": "Unassigned", "workstation": null, "groups": ["Former-Employees"], "disabled": true}
+  ]
+}

@@ -21,7 +21,7 @@ class Inventory:
         }
 
     @classmethod
-    def load(cls, path=None):
+    def load(cls, path=None, include_extensions=True):
         configured_path = path or os.getenv("INVENTORY_PATH")
 
         if configured_path:
@@ -33,6 +33,18 @@ class Inventory:
 
         try:
             data = json.loads(inventory_path.read_text())
+            state_extension = Path.home() / "netops-lab-state/lab_extensions.json"
+            extension_path = Path(os.getenv("LAB_EXTENSIONS_PATH", state_extension if state_extension.exists() else inventory_path.with_name("lab_extensions.json")))
+            if include_extensions and extension_path.exists():
+                extensions = json.loads(extension_path.read_text())
+                dynamic_workstations = extensions.get("workstations", [])
+                for workstation in dynamic_workstations:
+                    workstation["dynamic"] = True
+                data["devices"].extend(dynamic_workstations)
+                overrides = extensions.get("assignment_overrides", {})
+                for device in data["devices"]:
+                    if device["hostname"] in overrides:
+                        device["assigned_user"] = overrides[device["hostname"]]
         except (OSError, json.JSONDecodeError, KeyError) as error:
             raise InventoryError(
                 f"Unable to load device inventory: {inventory_path}"
