@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import socket
 import struct
+import subprocess
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -13,6 +14,37 @@ from containers.workstation.workstation_service import WorkstationConfig, Workst
 
 INTERFACE = "eth1"
 HTML_PATH = Path("/app/containers/workstation/index.html")
+
+
+def run_network_command(command, failure_message):
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise WorkstationOperationError(failure_message) from error
+    if result.returncode != 0:
+        raise WorkstationOperationError(result.stderr.strip() or failure_message)
+
+
+def set_office_interface(config, enabled):
+    desired_state = "up" if enabled else "down"
+    run_network_command(
+        ["ip", "link", "set", INTERFACE, desired_state],
+        f"Unable to set {INTERFACE} {desired_state}.",
+    )
+    if enabled:
+        run_network_command(
+            [
+                "ip", "route", "replace", "10.10.0.0/16", "via",
+                config.gateway, "dev", INTERFACE,
+            ],
+            "Unable to restore the office-network route.",
+        )
 
 
 def read_text(path, default="unknown"):
@@ -56,14 +88,24 @@ def get_printer_status(config):
 def get_workstation_status(state):
     config = state.config
     uptime = float(read_text("/proc/uptime", "0").split()[0])
+    operational = state.operational_status()
+    if operational["status"] == "online":
+        printer = get_printer_status(config)
+    else:
+        printer = {
+            "reachable": False,
+            "name": config.printer_name,
+            "status": "unreachable",
+            "queue": None,
+        }
     return {
-        "name": config.name, **state.operational_status(), "interface": INTERFACE,
+        "name": config.name, **operational, "interface": INTERFACE,
         "interface_state": read_text(f"/sys/class/net/{INTERFACE}/operstate"),
         "ip_address": get_ipv4_address(INTERFACE), "configured_ip_address": config.ip_address,
         "connected_switch": config.connected_switch,
         "mac_address": read_text(f"/sys/class/net/{INTERFACE}/address"),
         "uptime_seconds": int(uptime), "network": get_network_counters(INTERFACE),
-        "printer": get_printer_status(config),
+        "printer": printer,
     }
 
 
@@ -125,11 +167,25 @@ class WorkstationHandler(BaseHTTPRequestHandler):
             data, code = submit_print_job(self.workstation)
             self.send_json(data, code)
         elif self.path == "/state/offline":
-            self.workstation.set_offline()
-            self.send_json(get_workstation_status(self.workstation))
+            try:
+                set_office_interface(self.workstation.config, False)
+                self.workstation.set_offline()
+                self.send_json(get_workstation_status(self.workstation))
+            except WorkstationOperationError as error:
+                self.send_json(
+                    {"error": "interface_control_failed", "message": str(error)},
+                    503,
+                )
         elif self.path == "/state/online":
-            self.workstation.set_online()
-            self.send_json(get_workstation_status(self.workstation))
+            try:
+                set_office_interface(self.workstation.config, True)
+                self.workstation.set_online()
+                self.send_json(get_workstation_status(self.workstation))
+            except WorkstationOperationError as error:
+                self.send_json(
+                    {"error": "interface_control_failed", "message": str(error)},
+                    503,
+                )
         else:
             self.send_error(404)
 

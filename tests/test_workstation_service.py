@@ -15,6 +15,10 @@ class WorkstationServiceTests(unittest.TestCase):
             state = WorkstationState(WorkstationConfig.from_inventory(self.inventory, name))
             self.assertEqual(name, state.config.name)
             self.assertEqual(f"PRNT{((number - 1) // 3) + 1:02d}", state.config.printer_name)
+            self.assertEqual(
+                f"10.10.{((number - 1) // 3 + 1) * 10}.1",
+                state.config.gateway,
+            )
 
     def test_offline_state_blocks_printing_and_is_recoverable(self):
         state = WorkstationState(WorkstationConfig.from_inventory(self.inventory, "WS01"))

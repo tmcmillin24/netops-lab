@@ -56,15 +56,23 @@ Open the endpoint interfaces from macOS:
 - PRNT02: <http://127.0.0.1:8082>
 - PRNT03: <http://127.0.0.1:8083>
 
-Run the interactive topology overview from the macOS terminal:
+Run the Phase 5 operations console from the macOS terminal:
 
 ```bash
 python3 -m http.server 8090 --directory frontend
 ```
 
-Then open <http://127.0.0.1:8090>. The overview contains all 17 deployed
-devices and reads live data from the four endpoint APIs currently published to
-macOS.
+Then open <http://127.0.0.1:8090>. The console provides Dashboard, Network,
+Systems, and Architecture views backed by the centralized API. Active
+Directory, Tickets, and Automation are labeled Planned Phase. Detailed launch
+and behavior notes are in [`frontend/README.md`](frontend/README.md).
+
+## Central backend API
+
+Phase 4 provides a FastAPI service that runs inside Lima and safely aggregates
+the inventory, Docker container availability, and live endpoint APIs. Setup,
+startup, test commands, routes, and safety restrictions are documented in
+[`backend/README.md`](backend/README.md). The development API uses port 8000.
 
 Destroy the lab when finished:
 

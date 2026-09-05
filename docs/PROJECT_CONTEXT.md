@@ -195,6 +195,15 @@ and `netops-network:phase2`. Application files are copied into the endpoint
 images at build time; the topology does not depend on absolute macOS source
 bind paths.
 
+The workstation offline fault lowers the endpoint's office-facing `eth1`
+interface while leaving its Containerlab management interface available for
+status inspection and recovery. Bringing a workstation online restores both
+the office interface and its `10.10.0.0/16` route through the assigned access
+gateway. Controlled ping binds to the validated
+source's inventory office IP so it cannot silently fall back through the
+management network. A workstation marked offline is therefore unreachable in
+office-network connectivity tests.
+
 ## Printer Resource Model
 
 Paper tray capacity:
@@ -437,9 +446,15 @@ Possible user actions may include:
 - checking service health
 - disabling and restoring simulated connections
 
-## Planned Interactive Frontend
+## Interactive Frontend
 
-The long-term primary frontend may include sections such as:
+The Phase 5 primary frontend is implemented under `frontend/` as a lightweight
+vanilla HTML, CSS, and JavaScript operations console. It is served locally on
+port 8090 and uses only the centralized Phase 4 API on port 8000 for inventory,
+live state, device actions, print submission, and controlled ping. It refreshes
+the overview and device state every five seconds without reloading the page.
+
+The primary navigation includes:
 
 - Dashboard
 - Network
@@ -449,7 +464,11 @@ The long-term primary frontend may include sections such as:
 - Automation
 - Architecture
 
-Devices should eventually be clickable.
+Dashboard, Network, Systems, and Architecture are live implemented pages.
+Active Directory, Tickets, and Automation are clearly marked Planned Phase and
+do not display fabricated data.
+
+Devices are clickable in the topology and Systems tables.
 
 Selecting a device should expose useful live information and safe management or troubleshooting actions.
 
@@ -465,7 +484,14 @@ Examples:
 - troubleshoot the fault
 - restore service
 
-The frontend should be a control and visualization layer over the actual lab.
+Device drawers preserve selection during refresh and show only telemetry the
+backend actually provides. Printer and workstation controls call allowlisted
+central backend routes; the browser never invokes Docker or endpoint mutation
+routes directly. A simple known-device ping interface is present as preparation
+for Phase 6, while traceroute, DNS, ARP, and route diagnostics remain future
+work.
+
+The frontend is a control and visualization layer over the actual lab.
 
 It should not be a fake dashboard where every value is hardcoded.
 
@@ -485,11 +511,14 @@ jobs to their assigned printer over the office-network interface using their
 inventory identity; printers validate that identity against their assigned
 three-workstation group.
 
-A future centralized backend should sit between the primary frontend and the infrastructure lab.
+The Phase 4 centralized backend is implemented with FastAPI under `backend/`.
+It runs as a process inside the Lima VM on port 8000, sitting between the
+future primary frontend and the infrastructure lab. It reads configuration
+from `configs/inventory.json`, discovers current Containerlab management
+addresses through read-only Docker inspection, and queries live printer and
+workstation APIs without confusing management addresses with office IPs.
 
-FastAPI is a likely candidate, but it is not required yet.
-
-The centralized backend should:
+The centralized backend:
 
 - query live infrastructure state
 - expose safe API endpoints
@@ -500,6 +529,30 @@ The centralized backend should:
 - support automation
 - prevent unrestricted shell access
 - support a safe public portfolio demo
+
+Controlled ping accepts only two current inventory hostnames. The backend
+constructs a fixed `docker exec` argument list that runs one ping from the
+validated source container to the destination's inventory office IP. It never
+accepts command text or arbitrary IP addresses and never invokes a shell.
+
+Infrastructure fault injection is available for RTR01, CORE01, and SW01-SW03.
+The backend uses fixed, allowlisted `docker exec` argument lists to change only
+the known office interfaces or Linux bridge; it does not stop containers or
+accept command text. Disabling an access switch removes connectivity for its
+attached endpoints. Disabling CORE01 removes routed connectivity while each
+access segment retains local switching. Disabling RTR01 removes upstream
+connectivity while internal office routing remains available. The frontend
+reports direct device state separately from dependency impact and exposes a
+restore action for every supported fault.
+
+Active printer resource faults are returned in the lab overview as structured
+alerts. The dashboard lists the affected printer and exact reason, and both the
+alert and topology device open live device details and recovery controls.
+
+Network-device status currently represents Containerlab container availability;
+it is labeled with `status_source: container_runtime`. Endpoint status comes
+from the live device service. This distinction avoids presenting baseline
+container checks as richer device telemetry.
 
 The public-facing version must not expose arbitrary shell execution.
 

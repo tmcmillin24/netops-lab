@@ -10,6 +10,7 @@ class WorkstationOperationError(RuntimeError):
 class WorkstationConfig:
     name: str
     ip_address: str
+    gateway: str
     connected_switch: str
     printer_name: str
     printer_ip: str
@@ -21,10 +22,16 @@ class WorkstationConfig:
             device["assigned_printer"],
             "printer"
         )
+        network = next(
+            network
+            for network in inventory.data["networks"]
+            if network["id"] == device["network"]
+        )
 
         return cls(
             name=device["hostname"],
             ip_address=device["ip_address"],
+            gateway=network["gateway"],
             connected_switch=device["connected_to"],
             printer_name=printer["hostname"],
             printer_ip=printer["ip_address"]
