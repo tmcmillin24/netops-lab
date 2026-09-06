@@ -1,4 +1,4 @@
-import {api, ApiError} from "./api.js?v=phase9-9";
+import {api, ApiError} from "./api.js?v=phase11-cleanup";
 
 const state = {
   page: "dashboard",
@@ -27,6 +27,7 @@ const pageTitles = {
   network: "Network",
   systems: "Systems",
   "active-directory": "Active Directory",
+  monitoring: "Monitoring",
   tickets: "Tickets",
   automation: "Automation",
   architecture: "Architecture"
@@ -82,14 +83,7 @@ function renderDashboard() {
   if (!state.connected || !state.overview) return unavailableState();
   const overview = state.overview;
   const events = overview.recent_events || [];
-  const accountHealth = state.directoryHealth;
-  const directoryHealth = !accountHealth
-    ? {tone: "loading", label: "Checking", detail: "Loading live account status from DC01"}
-    : accountHealth.status === "unavailable"
-      ? {tone: "unavailable", label: "Unavailable", detail: "DC01 account health could not be queried"}
-      : accountHealth.affected_accounts
-        ? {tone: "attention", label: `${accountHealth.affected_accounts} to review`, detail: `${accountHealth.locked_accounts} locked · ${accountHealth.password_expired_accounts} password expired · ${accountHealth.disabled_accounts} disabled`}
-        : {tone: "healthy", label: "Healthy", detail: "No locked, password-expired, or disabled accounts"};
+  const alertSummary = overview.monitoring?.summary || {active: 0, critical: 0, warning: 0, notice: 0};
   const infrastructure = [
     ["Routing and switching", state.devices.filter(device => ["router_firewall", "layer3_core_switch", "access_switch"].includes(device.device_type))],
     ["Workstation services", state.devices.filter(device => device.device_type === "workstation")],
@@ -97,16 +91,16 @@ function renderDashboard() {
     ["Server services", state.devices.filter(device => ["domain_controller", "file_server"].includes(device.device_type))]
   ];
   return `${pageIntro("Lab overview", "Live health and operational state from the centralized backend.")}
+    ${alertSummary.active ? `<button class="operational-alert-summary" type="button" data-page-link="monitoring"><span><strong>${alertSummary.active} active operational ${alertSummary.active === 1 ? "alert" : "alerts"}</strong><small>${alertSummary.critical} critical · ${alertSummary.warning} warning · ${alertSummary.notice} notice</small></span>${badge(overview.operational_health)}</button>` : ""}
     <section class="metric-grid" aria-label="Lab health summary">
       ${metric("Total devices", overview.total_devices, "Current inventory")}
-      ${metric("Online", overview.online_devices, "Available now", "good")}
-      ${metric("Offline", overview.offline_devices, "Includes unavailable", overview.offline_devices ? "bad" : "good")}
+      ${metric("Online", overview.online_devices, "Click to inspect available devices", "good", "online-devices")}
+      ${metric("Offline", overview.offline_devices, "Click to inspect immediate problems", overview.offline_devices ? "bad" : "good", "offline-devices")}
       ${metric("Printer attention", overview.printers_requiring_attention, "Click to inspect active faults", overview.printers_requiring_attention ? "warn" : "good", "printer-alerts")}
       ${metric("Service attention", overview.services_requiring_attention || 0, "Click to inspect server services", overview.services_requiring_attention ? "warn" : "good", "service-alerts")}
-      ${metric("Impacted", overview.impacted_devices || 0, "Click to inspect affected devices", overview.impacted_devices ? "warn" : "good", "impacted-devices")}
-      ${metric("Network health", overview.network_health, "Container and service checks", overview.network_health === "healthy" ? "good" : "bad")}
+      ${metric("Account Attention", alertSummary.account_attention || 0, "Accounts requiring review", alertSummary.account_attention ? "warn" : "good", "account-alerts")}
+      ${metric("Overall health", overview.operational_health || overview.network_health, "Devices, services, and accounts", (overview.operational_health || overview.network_health) === "healthy" ? "good" : "bad")}
     </section>
-    <button class="account-health-summary ${directoryHealth.tone}" type="button" data-dashboard-action="account-alerts" aria-label="Inspect Active Directory account health"><div><span class="account-health-icon" aria-hidden="true">${directoryHealth.tone === "attention" ? "!" : directoryHealth.tone === "unavailable" ? "×" : directoryHealth.tone === "loading" ? "…" : "✓"}</span><div><strong>Active Directory account health</strong><small>${escapeHtml(directoryHealth.detail)}</small></div></div>${badge(directoryHealth.label)}</button>
     <div class="dashboard-grid">
       <section class="panel"><div class="panel-header"><div><h3>Infrastructure health</h3><p>Grouped live availability</p></div>${badge(overview.network_health)}</div>
         <div class="health-list">${infrastructure.map(([label, devices]) => {
@@ -118,6 +112,33 @@ function renderDashboard() {
         <div class="event-list recent-event-list">${events.length ? events.slice(0, 15).map(event => `<button type="button" class="event-row event-button" data-device="${event.hostname}"><i class="${slug(event.type)}"></i><div><strong>${escapeHtml(event.hostname)}</strong><small>${escapeHtml(event.message)}</small></div>${badge(event.type)}</button>`).join("") : `<div class="empty-state">No recent state changes.</div>`}</div>
       </section>
     </div>`;
+}
+
+function formatAlertTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+}
+
+function renderMonitoring() {
+  if (state.loading) return loadingState("Evaluating current alert conditions…");
+  if (!state.connected || !state.overview) return unavailableState();
+  const monitoring = state.overview.monitoring || {summary: {}, active_alerts: [], resolved_alerts: []};
+  const alerts = monitoring.active_alerts;
+  const rows = alerts.map(alert => {
+    const device = alert.related?.device;
+    const username = alert.related?.username;
+    const target = device ? `data-alert-device="${escapeHtml(device)}"` : username ? `data-alert-user="${escapeHtml(username)}"` : "";
+    return `<tr ${target} tabindex="0"><td>${badge(alert.severity)}</td><td><strong>${escapeHtml(alert.source)}</strong><br><small>${escapeHtml(alert.source_type.replaceAll("_", " "))}</small></td><td>${escapeHtml(alert.summary)}</td><td>${formatAlertTime(alert.detected_at)}</td><td>${badge("active")}</td></tr>`;
+  }).join("");
+  return `${pageIntro("Monitoring and alerts", "Current health conditions derived from live lab state.")}
+    <section class="monitoring-summary" aria-label="Alert summary">
+      ${metric("Active", monitoring.summary.active || 0, "Current conditions", monitoring.summary.active ? "bad" : "good")}
+      ${metric("Critical", monitoring.summary.critical || 0, "Immediate attention", monitoring.summary.critical ? "bad" : "good")}
+      ${metric("Warnings", monitoring.summary.warning || 0, "Operational attention", monitoring.summary.warning ? "warn" : "good")}
+      ${metric("Notices", monitoring.summary.notice || 0, "Lower severity", monitoring.summary.notice ? "warn" : "good")}
+      ${metric("Account attention", monitoring.summary.account_attention || 0, "Live directory state", monitoring.summary.account_attention ? "warn" : "good")}
+    </section>
+    <section class="panel"><div class="panel-header"><div><h3>Active alerts</h3><p>Current conditions requiring operational attention</p></div></div><div class="table-wrap monitoring-table"><table><thead><tr><th>Severity</th><th>Source</th><th>Issue</th><th>Detected</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No active alerts.</td></tr>'}</tbody></table></div></section>`;
 }
 
 function metric(label, value, note, tone = "", action = "") {
@@ -218,7 +239,6 @@ function renderActiveDirectory() {
   const employees = activeUsers.filter(user => user.account_type === "employee");
   const unassignedUsers = employees.filter(user => !user.workstation);
   const remoteUsers = employees.filter(user => user.remote);
-  const attentionUsers = activeUsers.filter(user => user.locked || user.password_expired);
   const disabledUsers = directory.users.filter(user => !user.enabled);
   const workstations = state.devices.filter(device => device.device_type === "workstation");
   const accountStatus = user => user.enabled ? user.locked ? "locked" : user.password_expired ? "password expired" : "enabled" : "disabled";
@@ -228,7 +248,6 @@ function renderActiveDirectory() {
     users: `<div class="panel-header"><div><h3>Users</h3><p>${activeUsers.length} active domain accounts · 8 visible before scrolling</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Name</th><th>Title</th><th>Department</th><th>Workstation</th><th>Status</th></tr></thead><tbody>${userRows(activeUsers)}</tbody></table></div>`,
     unassigned: `<div class="panel-header"><div><h3>Unassigned Members</h3><p>${unassignedUsers.length} enabled employees without a device</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Name</th><th>Title</th><th>Department</th><th>Workstation</th><th>Status</th></tr></thead><tbody>${userRows(unassignedUsers) || '<tr><td colspan="5">No enabled employees are currently unassigned.</td></tr>'}</tbody></table></div>`,
     remote: `<div class="panel-header"><div><h3>Remote Users</h3><p>${remoteUsers.length} employees issued company laptops</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Name</th><th>Title</th><th>Department</th><th>Laptop</th><th>Status</th></tr></thead><tbody>${userRows(remoteUsers)}</tbody></table></div>`,
-    attention: `<div class="panel-header"><div><h3>Account Attention</h3><p>Controlled lockout and password-expiry troubleshooting</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Name</th><th>Title</th><th>Department</th><th>Workstation</th><th>Issue</th></tr></thead><tbody>${userRows(attentionUsers) || '<tr><td colspan="5">No active accounts require attention.</td></tr>'}</tbody></table></div>`,
     computers: `<div class="panel-header"><div><h3>Computers</h3><p>${workstations.length} pre-staged workstation objects · 8 visible before scrolling</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Computer</th><th>Assigned user</th><th>Floor</th><th>Department</th><th>Join state</th></tr></thead><tbody>${workstations.map(device => { const user = activeUsers.find(item => item.workstation === device.hostname); return `<tr tabindex="0" ${user ? `data-ad-user="${user.username}"` : ""}><td><strong>${escapeHtml(device.hostname)}</strong></td><td>${escapeHtml(user?.display_name || "Unassigned")}</td><td>${escapeHtml(device.floor)}</td><td>${escapeHtml(device.department)}</td><td>${badge(device.domain_joined ? "joined" : "not joined")}</td></tr>`; }).join("")}</tbody></table></div>`,
     groups: `<div class="panel-header"><div><h3>Security Groups</h3><p>${directory.groups.length} role-based access groups · select one to view members</p></div></div><div class="group-list directory-object-list directory-list-scroll">${directory.groups.map(group => `<button class="group-row" type="button" data-directory-group="${escapeHtml(group.name)}"><span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.description)}</small></span><small>${group.members.length} members</small></button>`).join("")}</div>`,
     disabled: `<div class="panel-header"><div><h3>Disabled Accounts</h3><p>Former employees retained for audit history</p></div></div><div class="table-wrap directory-table-scroll"><table><thead><tr><th>Name</th><th>Username</th><th>Status</th></tr></thead><tbody>${disabledRows}</tbody></table></div>`
@@ -242,7 +261,7 @@ function renderActiveDirectory() {
       <article><span>Computers</span><strong>${workstations.length}</strong><small>Pre-staged objects</small></article>
       <article><span>Password policy</span><strong>${policy.minimum_length || "—"} characters</strong><small>${policy.complexity ? "Complexity on" : "Complexity off"} · lock after ${policy.lockout_threshold ?? "—"} attempts</small></article>
     </section>
-    <div class="directory-tabbar"><nav class="directory-tabs" aria-label="Directory objects">${categories.map(([view, label, count]) => `<button type="button" data-directory-view="${view}" class="${state.directoryView === view ? "active" : ""}"><span>${label}</span><small>${count}</small></button>`).join("")}</nav><button type="button" data-directory-view="attention" class="account-attention-tab ${attentionUsers.length ? "has-attention" : "is-clear"} ${state.directoryView === "attention" ? "active" : ""}"><span class="attention-icon" aria-hidden="true">!</span><span>Account Attention</span><small>${attentionUsers.length}</small></button></div>
+    <div class="directory-tabbar"><nav class="directory-tabs" aria-label="Directory objects">${categories.map(([view, label, count]) => `<button type="button" data-directory-view="${view}" class="${state.directoryView === view ? "active" : ""}"><span>${label}</span><small>${count}</small></button>`).join("")}</nav></div>
     <section class="panel directory-content">${views[state.directoryView] || views.users}</section>`;
 }
 
@@ -255,10 +274,32 @@ function openDirectoryUser(username) {
   document.getElementById("deviceDrawer").classList.add("open");
   document.getElementById("deviceDrawer").setAttribute("aria-hidden", "false");
   document.getElementById("drawerBackdrop").hidden = false;
-  const groupOptions = state.directory.groups.map(group => `<option value="${group.name}">${escapeHtml(group.name)}</option>`).join("");
+  const groupOptions = state.directory.groups.map(group => `<option value="${group.name}" data-member="${user.groups.includes(group.name)}">${escapeHtml(group.name)}${user.groups.includes(group.name) ? " · Member" : ""}</option>`).join("");
   const currentStatus = user.enabled ? user.locked ? "locked" : user.password_expired ? "password expired" : "enabled" : "disabled";
-  document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><div class="drawer-header-row"><div><h2>${escapeHtml(user.display_name)}</h2><p>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p></div>${badge(currentStatus)}</div></header><section class="drawer-section"><h3>Organization</h3><div class="facts">${fact("Department", user.department)}${fact("Floor", user.floor)}${fact("Assigned workstation", user.workstation || "Unassigned")}${fact("Account type", String(user.account_type || "employee").replaceAll("_", " "))}${fact("Remote user", user.remote ? "Yes" : "No")}${fact("Privileged identity", user.privileged ? "Yes" : "No")}${fact("Domain", state.directory.domain)}</div>${user.account_type === "employee" && user.workstation ? `<button class="action-button secondary" data-unassign-employee="${user.username}" type="button">Unassign from ${escapeHtml(user.workstation)}</button>` : user.account_type === "employee" && user.enabled ? `<button class="action-button" data-open-assignment="${user.username}" type="button">Assign a device</button>` : ""}</section><section class="drawer-section"><h3>Account state</h3><div class="facts">${fact("Enabled", user.enabled ? "Yes" : "No")}${fact("Locked", user.locked ? "Yes" : "No")}${fact("Password expired", user.password_expired ? "Yes" : "No")}${fact("Bad password attempts", user.bad_password_count)}${fact("Groups", user.groups.join(", ") || "None")}</div></section><section class="drawer-section"><h3>File Share Access</h3><p class="section-note">Effective access from AD security-group membership.</p><div id="userFileShareAccess" class="loading-state compact"><strong>Loading FILE01 access</strong>Querying live group membership…</div></section><section class="drawer-section"><h3>Safe account actions</h3><div class="action-grid"><button class="action-button danger" data-ad-action="disable" data-ad-user="${user.username}">Disable</button><button class="action-button" data-ad-action="enable" data-ad-user="${user.username}">Enable</button><button class="action-button secondary" data-ad-action="unlock" data-ad-user="${user.username}">Unlock</button><button class="action-button warning" data-ad-reset="${user.username}">Reset password</button></div><div id="actionFeedback" class="action-feedback"></div></section><section class="drawer-section"><h3>Group membership</h3><div class="field"><label for="adGroup">Security group</label><select id="adGroup">${groupOptions}</select></div><div class="action-grid"><button class="action-button" data-ad-membership="add" data-ad-user="${user.username}">Add</button><button class="action-button secondary" data-ad-membership="remove" data-ad-user="${user.username}">Remove</button></div></section>`;
+  const recoveryActions = [
+    user.locked ? `<button class="action-button" data-ad-action="unlock" data-ad-user="${user.username}">Unlock account</button>` : "",
+    user.password_expired ? `<button class="action-button warning" data-ad-reset="${user.username}">Reset expired password</button>` : "",
+    !user.enabled ? `<button class="action-button" data-ad-action="enable" data-ad-user="${user.username}">Enable account</button>` : "",
+  ].filter(Boolean).join("");
+  const recoverySection = recoveryActions
+    ? `<section class="drawer-section account-recovery"><h3>Recommended recovery</h3><p class="section-note">Only actions relevant to the current account state are shown.</p><div class="action-grid">${recoveryActions}</div></section>`
+    : `<section class="drawer-section account-recovery"><div class="account-state-clear"><strong>Account is operational</strong><span>No account-state recovery is currently required.</span></div></section>`;
+  const administrativeActions = user.enabled
+    ? `${user.password_expired ? "" : `<button class="action-button warning" data-ad-reset="${user.username}">Reset password</button>`}<button class="action-button danger" data-ad-action="disable" data-ad-user="${user.username}">Disable account</button>`
+    : "";
+  document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><div class="drawer-header-row"><div><h2>${escapeHtml(user.display_name)}</h2><p>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p></div>${badge(currentStatus)}</div></header>${recoverySection}<div id="actionFeedback" class="action-feedback directory-action-feedback"></div><section class="drawer-section"><h3>Organization</h3><div class="facts">${fact("Department", user.department)}${fact("Floor", user.floor)}${fact("Assigned workstation", user.workstation || "Unassigned")}${fact("Account type", String(user.account_type || "employee").replaceAll("_", " "))}${fact("Remote user", user.remote ? "Yes" : "No")}${fact("Privileged identity", user.privileged ? "Yes" : "No")}${fact("Domain", state.directory.domain)}</div>${user.account_type === "employee" && user.workstation ? `<button class="action-button secondary account-device-action" data-unassign-employee="${user.username}" type="button">Unassign from ${escapeHtml(user.workstation)}</button>` : user.account_type === "employee" && user.enabled ? `<button class="action-button account-device-action" data-open-assignment="${user.username}" type="button">Assign a device</button>` : ""}</section><section class="drawer-section"><h3>Account state</h3><div class="facts">${fact("Enabled", user.enabled ? "Yes" : "No")}${fact("Locked", user.locked ? "Yes" : "No")}${fact("Password expired", user.password_expired ? "Yes" : "No")}${fact("Bad password attempts", user.bad_password_count)}${fact("Groups", user.groups.join(", ") || "None")}</div></section><section class="drawer-section"><h3>File Share Access</h3><p class="section-note">Effective access from AD security-group membership.</p><div id="userFileShareAccess" class="loading-state compact"><strong>Loading FILE01 access</strong>Querying live group membership…</div></section><section class="drawer-section"><h3>Group membership</h3><div class="field"><label for="adGroup">Security group</label><select id="adGroup">${groupOptions}</select></div><button id="adGroupAction" class="action-button secondary" data-ad-membership data-ad-user="${user.username}">Update membership</button></section>${administrativeActions ? `<section class="drawer-section account-administration"><h3>Account administration</h3><p class="section-note">Routine and potentially disruptive account actions.</p><div class="action-grid">${administrativeActions}</div></section>` : ""}`;
+  updateDirectoryGroupAction();
   loadDirectoryUserFileAccess(username);
+}
+
+function updateDirectoryGroupAction() {
+  const group = document.getElementById("adGroup");
+  const button = document.getElementById("adGroupAction");
+  if (!group || !button) return;
+  const isMember = group.selectedOptions[0]?.dataset.member === "true";
+  button.dataset.adMembership = isMember ? "remove" : "add";
+  button.classList.toggle("secondary", isMember);
+  button.textContent = `${isMember ? "Remove from" : "Add to"} ${group.value}`;
 }
 
 async function loadDirectoryUserFileAccess(username) {
@@ -364,7 +405,7 @@ async function openAssignmentWizard(username) {
     const options = await api.employeeOptions();
     const user = state.directory?.users.find(item => item.username === username);
     const devices = options.workstations.map(item => `<option value="${item.hostname}">${item.hostname} · ${escapeHtml(item.floor)} · ${escapeHtml(item.department)}</option>`).join("");
-    document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><div><p>Device assignment</p><h2>${escapeHtml(user?.display_name || username)}</h2><p>Selecting a device applies its floor and department security group.</p></div></header><section class="drawer-section"><div class="field"><label for="employeeAssignmentDevice">Available device</label><select id="employeeAssignmentDevice">${devices}</select></div><button class="action-button" type="button" data-assign-employee="${escapeHtml(username)}" ${devices ? "" : "disabled"}>Assign device</button>${devices ? "" : '<div class="diagnostic-result">No unassigned devices are available.</div>'}<div id="actionFeedback" class="action-feedback"></div></section>`;
+    document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><button class="drawer-back" type="button" data-return-ad-user="${escapeHtml(username)}">← Account details</button><div><p>Device assignment</p><h2>${escapeHtml(user?.display_name || username)}</h2><p>Selecting a device applies its floor and department security group.</p></div></header><section class="drawer-section"><div class="field"><label for="employeeAssignmentDevice">Available device</label><select id="employeeAssignmentDevice">${devices}</select></div><button class="action-button" type="button" data-assign-employee="${escapeHtml(username)}" ${devices ? "" : "disabled"}>Assign device</button>${devices ? "" : '<div class="diagnostic-result">No unassigned devices are available.</div>'}<div id="actionFeedback" class="action-feedback"></div></section>`;
   } catch (error) { showActionError(error); }
 }
 
@@ -424,7 +465,7 @@ function architectureNode(title, description) {
 
 function renderPage() {
   document.getElementById("pageTitle").textContent = pageTitles[state.page];
-  const renderers = {dashboard: renderDashboard, network: renderNetwork, systems: renderSystems, "active-directory": renderActiveDirectory, architecture: renderArchitecture};
+  const renderers = {dashboard: renderDashboard, network: renderNetwork, systems: renderSystems, "active-directory": renderActiveDirectory, monitoring: renderMonitoring, architecture: renderArchitecture};
   content.innerHTML = renderers[state.page] ? renderers[state.page]() : renderPlanned(state.page);
 }
 
@@ -453,13 +494,18 @@ function renderDrawer() {
       <section class="drawer-section"><h3>Safe actions</h3><div class="action-grid"><button class="action-button danger" data-workstation-action="offline">Set Offline</button><button class="action-button" data-workstation-action="online">Set Online</button>${device.dynamic ? `<button class="action-button danger" data-remove-device="${device.hostname}" ${device.assigned_user ? "disabled" : ""}>Remove device</button>` : ""}</div>${device.dynamic && device.assigned_user ? `<div class="event-box warning">Unassign ${escapeHtml(device.assigned_user)} in Active Directory before removing this device.</div>` : device.dynamic ? `<div class="event-box warning">Removing this device redeploys the lab.</div>` : `<div class="event-box">Baseline devices are protected from removal.</div>`}<div id="actionFeedback" class="action-feedback"></div></section>`;
   } else if (device.device_type === "file_server") {
     const users = state.devices.filter(item => item.device_type === "workstation" && item.assigned_user).map(item => `<option value="${item.assigned_user}|${item.hostname}">${escapeHtml(item.assigned_user)} · ${item.hostname}</option>`).join("");
-    specific = `<section class="drawer-section"><h3>File services</h3><div class="facts">${fact("SMB service", live.smb_running ? "Running" : "Stopped")}${fact("Shares", live.share_count)}${fact("Latest event", live.last_event)}</div><div class="share-list">${(live.shares || []).map(share => `<div class="share-row"><span><strong>${escapeHtml(share.name)}</strong><small>Read: ${escapeHtml(share.read_groups.join(", "))} · Write: ${escapeHtml(share.write_groups.join(", "))}</small><small>${share.effective_user_count ?? "View"} effective users</small></span><div class="share-actions">${badge(!share.enabled ? "disabled" : share.read_only ? "read only" : "available")}<button class="action-button secondary" type="button" data-manage-share="${escapeHtml(share.name)}">Manage Access</button></div></div>`).join("")}</div></section><section class="drawer-section"><h3>Controlled access check</h3><div class="field"><label for="fileAccessIdentity">User and assigned device</label><select id="fileAccessIdentity">${users}</select></div><div class="field"><label for="fileAccessShare">Share</label><select id="fileAccessShare">${(live.shares || []).map(share => `<option value="${escapeHtml(share.name)}">${escapeHtml(share.name)}</option>`).join("")}</select></div><div class="field"><label for="fileAccessOperation">Operation</label><select id="fileAccessOperation"><option value="read">Read</option><option value="write">Write</option></select></div><button class="action-button" type="button" data-file-access-check>Check access</button><div id="actionFeedback" class="action-feedback"></div><div class="event-box">Access decisions use live DC01 group membership. Phase 10 will add remediation controls.</div></section>`;
+    const recoveryItems = [];
+    if (live.status === "offline") recoveryItems.push(`<div class="remediation-item"><div><strong>FILE01 is offline</strong><small>The office-facing interface is unavailable.</small></div><button class="action-button" type="button" data-file-remediation="online">Bring FILE01 Online</button></div>`);
+    if (live.status === "online" && !live.smb_running) recoveryItems.push(`<div class="remediation-item"><div><strong>File service stopped</strong><small>FILE01 is online, but SMB and its shares are unavailable.</small></div><button class="action-button" type="button" data-file-remediation="restart-service">Restart File Service</button></div>`);
+    const recoverySection = recoveryItems.length ? `<section class="drawer-section"><h3>Recommended recovery</h3><div class="remediation-list">${recoveryItems.join("")}</div></section>` : "";
+    const faultControls = live.status === "online" ? `<section class="drawer-section"><h3>Controlled service state</h3><div class="action-grid"><button class="action-button danger" type="button" data-file-fault="offline">Set FILE01 Offline</button>${live.smb_running ? '<button class="action-button warning" type="button" data-file-fault="service-stop">Stop File Service</button>' : ""}</div></section>` : "";
+    specific = `${recoverySection}<section class="drawer-section"><h3>File services</h3><div class="facts">${fact("Server", live.status === "online" ? "Online" : "Offline")}${fact("File service", live.smb_running ? "Running" : "Down")}${fact("Shares", live.share_count)}${fact("Latest event", live.last_event)}</div><div class="share-list">${(live.shares || []).map(share => `<div class="share-row"><span><strong>${escapeHtml(share.name)}</strong><small>Expected: Read ${escapeHtml(share.read_groups.join(", "))} · Write ${escapeHtml(share.write_groups.join(", "))}</small><small>${share.effective_user_count ?? "View"} effective users</small></span><div class="share-actions">${badge(!share.enabled ? "disabled" : share.read_only ? "read only" : "available")}${!share.enabled ? `<button class="action-button" type="button" data-file-share-remediation="enable" data-share="${escapeHtml(share.name)}">Enable Share</button>` : `<button class="action-button warning" type="button" data-file-share-fault="share-disable" data-share="${escapeHtml(share.name)}">Disable Share</button>`}${share.read_only ? `<button class="action-button" type="button" data-file-share-remediation="restore-write" data-share="${escapeHtml(share.name)}">Restore Write Access</button>` : ""}<button class="action-button secondary" type="button" data-manage-share="${escapeHtml(share.name)}">Manage Access</button></div></div>`).join("")}</div></section>${faultControls}<section class="drawer-section"><h3>Controlled access check</h3><div class="field"><label for="fileAccessIdentity">User and assigned device</label><select id="fileAccessIdentity">${users}</select></div><div class="field"><label for="fileAccessShare">Share</label><select id="fileAccessShare">${(live.shares || []).map(share => `<option value="${escapeHtml(share.name)}">${escapeHtml(share.name)}</option>`).join("")}</select></div><div class="field"><label for="fileAccessOperation">Operation</label><select id="fileAccessOperation"><option value="read">Read</option><option value="write">Write</option></select></div><button class="action-button" type="button" data-file-access-check>Check access</button><div id="actionFeedback" class="action-feedback"></div><div class="event-box">Access decisions use live DC01 group membership. Failed checks identify the constrained recovery path.</div></section>`;
   } else {
     const interfaces = Object.entries(live.interfaces || {}).map(([name, status]) => `${name}: ${status}`).join(", ");
     specific = `<section class="drawer-section"><h3>Infrastructure state</h3><div class="facts">${fact("Interfaces", interfaces)}${fact("Dependency status", device.dependency_status)}${fact("Impacted by", device.impacted_by?.join(", "))}</div>${device.impact_reason ? `<div class="event-box warning">${escapeHtml(device.impact_reason)}</div>` : ""}</section><section class="drawer-section"><h3>Safe actions</h3><div class="action-grid"><button class="action-button danger" data-infrastructure-action="disable" type="button">Disable network function</button><button class="action-button" data-infrastructure-action="restore" type="button">Restore network function</button></div><div id="actionFeedback" class="action-feedback"></div></section>`;
   }
   const displayStatus = device.dependency_status === "impacted" ? "impacted" : device.status;
-  const returnLabels = {"printer-alerts": "printer alerts", "service-alerts": "service attention", "impacted-devices": "impacted devices"};
+  const returnLabels = {"printer-alerts": "printer alerts", "service-alerts": "service attention", "impacted-devices": "impacted devices", "online-devices": "online devices", "offline-devices": "offline devices"};
   const back = state.drawerReturn ? `<button class="drawer-back" type="button" data-drawer-back="${state.drawerReturn}">← Back to ${returnLabels[state.drawerReturn] || "dashboard alerts"}</button>` : "";
   document.getElementById("drawerContent").innerHTML = `${back}<header class="drawer-header"><div class="drawer-header-row"><div><h2>${device.hostname}</h2><p>${escapeHtml(typeLabels[device.device_type])}</p></div>${badge(displayStatus)}</div></header>${device.impact_reason ? `<section class="drawer-section"><div class="active-fault dependency"><strong>Connectivity impacted</strong><span>${escapeHtml(device.impact_reason)}</span></div></section>` : ""}<section class="drawer-section"><h3>Identity and connectivity</h3><div class="facts">${commonFacts}</div></section><section class="drawer-section"><h3>Network troubleshooting</h3><button class="action-button secondary" data-network-info="${device.hostname}" type="button">View routes and neighbors</button><div id="networkInfoResult"></div></section>${specific}`;
 }
@@ -503,6 +549,27 @@ function openImpactedDevices() {
   document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><h2>Impacted devices</h2><p>Devices that are offline, unavailable, or affected by an upstream fault</p></header><section class="drawer-section"><div class="impact-list">${impacted.length ? impacted.map(alert => { const device = state.devices.find(item => item.hostname === alert.hostname); return `<button type="button" class="impact-row" data-device="${alert.hostname}" data-return-list="impacted-devices"><span><strong>${alert.hostname}</strong><small>${escapeHtml(typeLabels[device?.device_type] || "Device")}</small></span><span>${escapeHtml(alert.reason)}</span><b>Details →</b></button>`; }).join("") : `<div class="event-box">No devices are currently impacted.</div>`}</div></section>`;
 }
 
+function openDeviceStatusList(mode) {
+  const isOnline = mode === "online";
+  const devices = state.devices.filter(device => {
+    const unavailable = ["offline", "unavailable"].includes(device.status) || device.dependency_status === "impacted";
+    return isOnline ? !unavailable : unavailable;
+  });
+  const returnList = `${mode}-devices`;
+  state.selectedDevice = null;
+  state.drawerReturn = null;
+  document.getElementById("deviceDrawer").classList.add("open");
+  document.getElementById("deviceDrawer").setAttribute("aria-hidden", "false");
+  document.getElementById("drawerBackdrop").hidden = false;
+  const rows = devices.map(device => {
+    const reason = isOnline
+      ? `${typeLabels[device.device_type] || "Device"} · ${device.ip_address || "Layer 2"}`
+      : device.impact_reason || device.live?.message || device.service_error || `${device.hostname} is ${device.status}.`;
+    return `<button type="button" class="impact-row" data-device="${device.hostname}" data-return-list="${returnList}"><span><strong>${device.hostname}</strong><small>${escapeHtml(typeLabels[device.device_type] || "Device")}</small></span><span>${escapeHtml(reason)}</span><b>Details →</b></button>`;
+  }).join("");
+  document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><h2>${isOnline ? "Online devices" : "Offline devices"}</h2><p>${isOnline ? "Devices currently available in the office environment" : "Unavailable devices and their immediate observed problem"}</p></header><section class="drawer-section"><div class="impact-list">${rows || `<div class="event-box">No devices are currently ${mode}.</div>`}</div></section>`;
+}
+
 function openPrinterAlerts() {
   const alerts = state.overview?.printer_alerts || [];
   state.selectedDevice = null;
@@ -538,7 +605,7 @@ function openAccountAlerts() {
 async function openDashboardDirectoryUser(username) {
   const healthEntry = state.directoryHealth?.affected_users?.find(user => user.username === username);
   state.page = "active-directory";
-  state.directoryView = healthEntry?.issues.includes("Disabled") ? "disabled" : "attention";
+  state.directoryView = healthEntry?.issues.includes("Disabled") ? "disabled" : "users";
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.page === "active-directory"));
   closeDrawer();
   renderPage();
@@ -561,13 +628,10 @@ async function loadData(force = false) {
   state.refreshing = true;
   document.getElementById("refreshButton").disabled = true;
   try {
-    const [overview, directoryHealth] = await Promise.all([
-      api.overview(),
-      state.page === "dashboard" ? api.directoryAccountHealth().catch(error => ({status: "unavailable", error: error.message})) : Promise.resolve(null)
-    ]);
+    const overview = await api.overview();
     state.overview = overview;
     state.devices = overview.devices;
-    if (directoryHealth) state.directoryHealth = directoryHealth;
+    if (overview.account_health) state.directoryHealth = overview.account_health;
     state.loading = false;
     setBackendState(true);
     document.getElementById("lastUpdated").textContent = `Updated ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"})}`;
@@ -615,14 +679,28 @@ async function performAction(callback, successMessage) {
   }
 }
 
-async function performDirectoryAction(callback, successMessage, username) {
+async function performDirectoryAction(callback, successMessage, username, button = null) {
+  const drawer = document.getElementById("deviceDrawer");
+  const scrollPosition = drawer.scrollTop;
+  const originalLabel = button?.textContent;
   try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Applying…";
+    }
     await callback();
     await loadDirectory();
     showToast(successMessage);
     renderPage();
     openDirectoryUser(username);
+    drawer.scrollTop = scrollPosition;
+    const feedback = document.getElementById("actionFeedback");
+    if (feedback) feedback.innerHTML = `<div class="diagnostic-result success"><strong>Account updated</strong><span>${escapeHtml(successMessage)}</span></div>`;
   } catch (error) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
     showActionError(error instanceof ApiError ? error : new ApiError("The directory action failed."));
   }
 }
@@ -630,6 +708,54 @@ async function performDirectoryAction(callback, successMessage, username) {
 document.addEventListener("click", async event => {
   const dashboardAdUser = event.target.closest("[data-dashboard-ad-user]");
   if (dashboardAdUser) return openDashboardDirectoryUser(dashboardAdUser.dataset.dashboardAdUser);
+  const fileFault = event.target.closest("[data-file-fault]");
+  if (fileFault) {
+    fileFault.disabled = true;
+    fileFault.textContent = "Applying…";
+    try {
+      const result = await api.fileServerFault(fileFault.dataset.fileFault);
+      await loadData(true);
+      showToast(result.last_event);
+      return openDrawer("FILE01");
+    } catch (error) { showActionError(error); }
+    return;
+  }
+  const shareFault = event.target.closest("[data-file-share-fault]");
+  if (shareFault) {
+    shareFault.disabled = true;
+    shareFault.textContent = "Applying…";
+    try {
+      const result = await api.fileShareFault(shareFault.dataset.share, shareFault.dataset.fileShareFault);
+      await loadData(true);
+      showToast(result.last_event);
+      return openDrawer("FILE01");
+    } catch (error) { showActionError(error); }
+    return;
+  }
+  const fileRemediation = event.target.closest("[data-file-remediation]");
+  if (fileRemediation) {
+    fileRemediation.disabled = true;
+    fileRemediation.textContent = "Recovering…";
+    try {
+      const result = await api.fileServerRemediation(fileRemediation.dataset.fileRemediation);
+      await loadData(true);
+      showToast(result.message);
+      return openDrawer("FILE01");
+    } catch (error) { showActionError(error); }
+    return;
+  }
+  const shareRemediation = event.target.closest("[data-file-share-remediation]");
+  if (shareRemediation) {
+    shareRemediation.disabled = true;
+    shareRemediation.textContent = "Recovering…";
+    try {
+      const result = await api.fileShareRemediation(shareRemediation.dataset.share, shareRemediation.dataset.fileShareRemediation);
+      await loadData(true);
+      showToast(result.message);
+      return openDrawer("FILE01");
+    } catch (error) { showActionError(error); }
+    return;
+  }
   const manageShare = event.target.closest("[data-manage-share]");
   if (manageShare) return openManageFileAccess(manageShare.dataset.manageShare);
   if (event.target.closest("[data-file-access-back]")) return openDrawer("FILE01");
@@ -653,6 +779,8 @@ document.addEventListener("click", async event => {
   if (event.target.closest("[data-draft-workstation]")) return draftWorkstation();
   if (event.target.closest("[data-add-employee]")) return openEmployeeWizard();
   if (event.target.closest("[data-create-employee]")) return createEmployee();
+  const returnDirectoryUser = event.target.closest("[data-return-ad-user]");
+  if (returnDirectoryUser) return openDirectoryUser(returnDirectoryUser.dataset.returnAdUser);
   const openAssignment = event.target.closest("[data-open-assignment]");
   if (openAssignment) return openAssignmentWizard(openAssignment.dataset.openAssignment);
   const assignEmployee = event.target.closest("[data-assign-employee]");
@@ -708,16 +836,25 @@ document.addEventListener("click", async event => {
     } catch (error) { showActionError(error); }
     return;
   }
+  const pageLink = event.target.closest("[data-page-link]");
+  if (pageLink) {
+    state.page = pageLink.dataset.pageLink;
+    document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.page === state.page));
+    renderPage();
+    content.focus();
+    return;
+  }
+  const alertDevice = event.target.closest("[data-alert-device]");
+  if (alertDevice) return openDrawer(alertDevice.dataset.alertDevice);
+  const alertUser = event.target.closest("[data-alert-user]");
+  if (alertUser) return openDashboardDirectoryUser(alertUser.dataset.alertUser);
   const nav = event.target.closest("[data-page]");
   if (nav) {
     state.page = nav.dataset.page;
     document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item === nav));
     document.querySelector(".sidebar").classList.remove("open");
     renderPage();
-    if (state.page === "dashboard") {
-      await loadDirectoryHealth();
-      renderPage();
-    } else if (state.page === "active-directory") {
+    if (state.page === "active-directory") {
       await loadDirectory();
       renderPage();
     }
@@ -745,14 +882,25 @@ document.addEventListener("click", async event => {
     return performDirectoryAction(
       () => api.directoryUserAction(username, event.target.dataset.adAction),
       `${username}: account updated.`, username,
+      event.target,
     );
   }
   if (event.target.dataset.adReset) {
     const username = event.target.dataset.adReset;
+    const button = event.target;
+    const originalLabel = button.textContent;
     try {
+      button.disabled = true;
+      button.textContent = "Resetting…";
       const result = await api.resetDirectoryPassword(username);
-      document.getElementById("actionFeedback").innerHTML = `<div class="diagnostic-result success"><strong>Temporary password</strong><pre>${escapeHtml(result.temporary_password)}</pre><span>${escapeHtml(result.message)}</span></div>`;
+      await loadDirectory();
+      renderPage();
+      openDirectoryUser(username);
+      document.getElementById("deviceDrawer").scrollTop = 0;
+      document.getElementById("actionFeedback").innerHTML = `<div class="diagnostic-result success temporary-password-result"><strong>Password reset complete</strong><span>Copy this temporary password now. It will not be shown again.</span><pre>${escapeHtml(result.temporary_password)}</pre><span>${escapeHtml(result.message)}</span></div>`;
     } catch (error) {
+      button.disabled = false;
+      button.textContent = originalLabel;
       showActionError(error);
     }
     return;
@@ -763,11 +911,20 @@ document.addEventListener("click", async event => {
     return performDirectoryAction(
       () => api.directoryMembership(group, username, event.target.dataset.adMembership),
       `${username}: ${group} membership updated.`, username,
+      event.target,
     );
   }
   const dashboardAction = event.target.closest("[data-dashboard-action]");
   if (dashboardAction?.dataset.dashboardAction === "printer-alerts") {
     openPrinterAlerts();
+    return;
+  }
+  if (dashboardAction?.dataset.dashboardAction === "online-devices") {
+    openDeviceStatusList("online");
+    return;
+  }
+  if (dashboardAction?.dataset.dashboardAction === "offline-devices") {
+    openDeviceStatusList("offline");
     return;
   }
   if (dashboardAction?.dataset.dashboardAction === "impacted-devices") {
@@ -786,6 +943,8 @@ document.addEventListener("click", async event => {
   if (drawerBack) {
     if (drawerBack.dataset.drawerBack === "printer-alerts") openPrinterAlerts();
     else if (drawerBack.dataset.drawerBack === "service-alerts") openServiceAlerts();
+    else if (drawerBack.dataset.drawerBack === "online-devices") openDeviceStatusList("online");
+    else if (drawerBack.dataset.drawerBack === "offline-devices") openDeviceStatusList("offline");
     else openImpactedDevices();
     return;
   }
@@ -837,13 +996,20 @@ document.addEventListener("click", async event => {
     const operation = document.getElementById("fileAccessOperation").value;
     try {
       const result = await api.fileAccessCheck({username, device, share, operation});
-      document.getElementById("actionFeedback").innerHTML = `<div class="diagnostic-result ${result.allowed ? "success" : "error"}"><strong>${result.allowed ? "ACCESS GRANTED" : "ACCESS DENIED"}</strong><span>${escapeHtml(result.display_name)} · ${escapeHtml(result.device)} · ${escapeHtml(result.operation)} ${escapeHtml(result.share)}</span><span>${escapeHtml(result.reason)}</span></div>`;
+      const membershipRecovery = !result.allowed && result.reason.startsWith("Access requires membership")
+        ? `<div class="access-guidance"><strong>Suggested action</strong><span>Restore access through a configured AD security group.</span><button class="action-button secondary" type="button" data-manage-share="${escapeHtml(result.share)}">Manage ${escapeHtml(result.share)} Access</button></div>`
+        : "";
+      document.getElementById("actionFeedback").innerHTML = `<div class="diagnostic-result ${result.allowed ? "success" : "error"}"><strong>${result.allowed ? "ACCESS GRANTED" : "ACCESS DENIED"}</strong><span>${escapeHtml(result.display_name)} · ${escapeHtml(result.device)} · ${escapeHtml(result.operation)} ${escapeHtml(result.share)}</span><span>${escapeHtml(result.reason)}</span>${membershipRecovery}</div>`;
     } catch (error) { showActionError(error); }
     return;
   }
 });
 
 document.addEventListener("change", event => {
+  if (event.target.id === "adGroup") {
+    updateDirectoryGroupAction();
+    return;
+  }
   if (["diagnosticType", "pingSource", "pingDestination"].includes(event.target.id)) {
     state.pingResult = null;
     document.querySelector(".terminal-result")?.remove();

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 from backend.app.errors import LabServiceError
 
@@ -231,3 +232,64 @@ class FileServerService:
         )
         self.lab_service.record_event("FILE01", result["last_event"], "warning" if action in {"offline", "service-stop", "share-disable", "read-only"} else "success")
         return result
+
+    async def remediate(self, action, share_name=None):
+        actions = {
+            "online": ("online", "FILE01", "offline", "online"),
+            "restart-service": ("service-start", "SMB", "stopped", "running"),
+            "enable-share": ("share-enable", share_name, "disabled", "enabled"),
+            "restore-write": ("read-write", share_name, "read-only", "read/write"),
+        }
+        if action not in actions:
+            raise LabServiceError(
+                "unknown_fileserver_remediation",
+                "Unsupported FILE01 remediation action.",
+                404,
+            )
+        if action in {"enable-share", "restore-write"} and share_name is None:
+            raise LabServiceError(
+                "share_required", "A configured FILE01 share is required.", 422
+            )
+        fault_action, target, previous_label, new_label = actions[action]
+        before = await self.status()
+        share = None
+        if share_name is not None:
+            share = next((
+                item for item in before["shares"]
+                if item["name"].lower() == share_name.lower()
+            ), None)
+            if share is None:
+                raise LabServiceError(
+                    "unknown_share", "Unknown configured FILE01 share.", 404
+                )
+            target = share["name"]
+
+        needs_change = {
+            "online": before["status"] != "online",
+            "restart-service": not before["smb_running"],
+            "enable-share": share is not None and not share["enabled"],
+            "restore-write": share is not None and share["read_only"],
+        }[action]
+        if not needs_change:
+            return {
+                "success": True,
+                "changed": False,
+                "action": action,
+                "target": target,
+                "previous_state": new_label,
+                "new_state": new_label,
+                "message": f"{target} is already {new_label}.",
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        result = await self.fault(fault_action, share["name"] if share else None)
+        return {
+            "success": True,
+            "changed": True,
+            "action": action,
+            "target": target,
+            "previous_state": previous_label,
+            "new_state": new_label,
+            "message": result["last_event"],
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        }

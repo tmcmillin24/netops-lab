@@ -45,6 +45,30 @@ async def change_share_membership(
     )
 
 
+@router.post("/actions/online")
+async def bring_fileserver_online(request: Request):
+    return await request.app.state.fileserver_service.remediate("online")
+
+
+@router.post("/actions/restart-service")
+async def restart_file_service(request: Request):
+    return await request.app.state.fileserver_service.remediate("restart-service")
+
+
+@router.post("/shares/{share_name}/enable")
+async def enable_share(share_name: str, request: Request):
+    return await request.app.state.fileserver_service.remediate(
+        "enable-share", share_name
+    )
+
+
+@router.post("/shares/{share_name}/restore-write")
+async def restore_share_write_access(share_name: str, request: Request):
+    return await request.app.state.fileserver_service.remediate(
+        "restore-write", share_name
+    )
+
+
 @router.post("/access-check")
 async def access_check(payload: FileAccessCheckRequest, request: Request):
     return await request.app.state.fileserver_service.access_check(payload)

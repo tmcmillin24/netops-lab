@@ -19,6 +19,7 @@ SHARES = [
 class Lab:
     def __init__(self):
         self.status = {"hostname": "FILE01", "status": "online", "smb_running": True, "shares": SHARES}
+        self.events = []
 
     def get_device_config(self, hostname, expected_type=None):
         devices = {"FILE01": {"hostname": "FILE01", "type": "file_server"}, "WS01": {"hostname": "WS01", "type": "workstation"}}
@@ -27,10 +28,29 @@ class Lab:
         return devices[hostname.upper()]
 
     async def request_endpoint(self, device, method="GET", path="/status", json=None):
+        if method == "POST":
+            action = path.removeprefix("/faults/")
+            share_name = (json or {}).get("share")
+            if action == "online":
+                self.status = {**self.status, "status": "online", "last_event": "FILE01 office interface restored."}
+            elif action == "service-start":
+                self.status = {**self.status, "smb_running": True, "last_event": "SMB service started."}
+            elif action in {"share-enable", "read-write"}:
+                self.status = {
+                    **self.status,
+                    "shares": [
+                        {
+                            **share,
+                            **({"enabled": True} if action == "share-enable" else {"read_only": False}),
+                        } if share["name"] == share_name else share
+                        for share in self.status["shares"]
+                    ],
+                    "last_event": f"{share_name} share {'enabled' if action == 'share-enable' else 'write access restored'}.",
+                }
         return self.status
 
     def record_event(self, *arguments):
-        pass
+        self.events.append(arguments)
 
 
 class Directory:
@@ -162,3 +182,49 @@ def test_non_share_group_is_rejected():
     with pytest.raises(LabServiceError) as error:
         asyncio.run(service.membership_action("Finance", SimpleNamespace(username="jordan.lee", group="HR", action="add")))
     assert error.value.code == "group_not_authorized_for_share"
+
+
+def test_fileserver_and_smb_recovery_are_structured_and_idempotent():
+    lab = Lab()
+    lab.status = {**lab.status, "status": "offline", "smb_running": False}
+    service = FileServerService(lab, Directory())
+
+    online = asyncio.run(service.remediate("online"))
+    restarted = asyncio.run(service.remediate("restart-service"))
+    unchanged = asyncio.run(service.remediate("restart-service"))
+
+    assert online["previous_state"] == "offline"
+    assert online["new_state"] == "online"
+    assert restarted["changed"] is True
+    assert unchanged["changed"] is False
+    assert lab.events[-1][2] == "success"
+
+
+def test_share_enable_and_write_recovery_preserve_other_shares():
+    lab = Lab()
+    lab.status = {
+        **lab.status,
+        "shares": [
+            {**share, "enabled": share["name"] != "Finance", "read_only": share["name"] == "Engineering"}
+            for share in SHARES
+        ],
+    }
+    service = FileServerService(lab, Directory())
+
+    enabled = asyncio.run(service.remediate("enable-share", "Finance"))
+    write = asyncio.run(service.remediate("restore-write", "Engineering"))
+
+    shares = {share["name"]: share for share in lab.status["shares"]}
+    assert enabled["target"] == "Finance"
+    assert write["target"] == "Engineering"
+    assert shares["Finance"]["enabled"] is True
+    assert shares["Engineering"]["read_only"] is False
+    assert shares["HR"]["enabled"] is True
+
+
+def test_remediation_rejects_unknown_actions_and_shares():
+    service = FileServerService(Lab(), Directory())
+    with pytest.raises(LabServiceError):
+        asyncio.run(service.remediate("run-command"))
+    with pytest.raises(LabServiceError):
+        asyncio.run(service.remediate("enable-share", "Unknown"))

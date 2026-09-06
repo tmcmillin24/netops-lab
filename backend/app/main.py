@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from backend.app.errors import BackendError
-from backend.app.routes import active_directory, connectivity, devices, fileserver, health, lab, printers, provisioning, workstations
+from backend.app.routes import active_directory, connectivity, devices, fileserver, health, lab, monitoring, printers, provisioning, workstations
 from backend.app.services.active_directory import ActiveDirectoryService
 from backend.app.services.fileserver import FileServerService
 from backend.app.services.lab import LabService
@@ -61,6 +61,7 @@ def create_app(lab_service=None, ad_service=None):
 
     app.include_router(health.router)
     app.include_router(lab.router)
+    app.include_router(monitoring.router)
     app.include_router(devices.router)
     app.include_router(printers.router)
     app.include_router(workstations.router)

@@ -68,6 +68,10 @@ class FileServerState:
             self.last_event = "FILE01 office interface set offline."
         elif action == "online":
             subprocess.run(["ip", "link", "set", "eth1", "up"], check=True)
+            subprocess.run(
+                ["ip", "route", "replace", "10.10.0.0/16", "via", "10.10.40.1", "dev", "eth1"],
+                check=True,
+            )
             self.last_event = "FILE01 office interface restored."
         elif action == "service-stop":
             self.stop_smb()

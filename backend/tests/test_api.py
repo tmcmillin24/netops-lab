@@ -4,6 +4,14 @@ def test_health(client):
     assert response.json()["status"] == "ok"
 
 
+def test_monitoring_exposes_live_alert_summary(client):
+    response = client.get("/api/monitoring")
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["active"] == 0
+    assert response.json()["active_alerts"] == []
+
+
 def test_lab_overview(client):
     response = client.get("/api/lab")
     assert response.status_code == 200

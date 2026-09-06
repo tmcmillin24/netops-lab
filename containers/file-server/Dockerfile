@@ -1,7 +1,7 @@
 FROM debian:12-slim
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends iproute2 python3 samba \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends iproute2 iputils-ping python3 samba \
   && rm -rf /var/lib/apt/lists/*
 
 COPY containers/file-server/fileserver_api.py /usr/local/lib/netops/fileserver_api.py

@@ -9,6 +9,7 @@ def test_core_uses_default_deny_floor_forwarding_policy():
         assert f"iptables -A FORWARD -s {subnet} -d 10.10.254.1/32 -j ACCEPT" in topology
         assert f"iptables -A FORWARD -s {subnet} -d 10.10.40.10/32 -j ACCEPT" in topology
         assert f"iptables -A FORWARD -s {subnet} -d 10.10.40.20/32 -j ACCEPT" in topology
+    assert "iptables -A FORWARD -s 10.10.254.1/32 -d 10.10.40.20/32 -j ACCEPT" in topology
 
 
 def test_network_nodes_use_segmented_image():
@@ -36,6 +37,16 @@ def test_file01_shares_the_services_bridge():
     assert "ip link add br-services type bridge" in topology
     assert "ip link set eth5 master br-services" in topology
     assert "ip link set eth6 master br-services" in topology
+
+
+def test_server_images_support_real_ping_and_file01_restores_its_return_route():
+    dc_image = Path("containers/domain-controller/Dockerfile").read_text()
+    file_image = Path("containers/file-server/Dockerfile").read_text()
+    file_api = Path("containers/file-server/fileserver_api.py").read_text()
+
+    assert "iputils-ping" in dc_image
+    assert "iputils-ping" in file_image
+    assert '["ip", "route", "replace", "10.10.0.0/16", "via", "10.10.40.1", "dev", "eth1"]' in file_api
 
 
 def test_dynamic_switch_ports_never_bridge_management_interface():

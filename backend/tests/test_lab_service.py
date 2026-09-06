@@ -60,3 +60,30 @@ def test_directly_offline_workstation_is_counted_as_impacted():
         {"hostname": "WS02", "reason": "WS02 is offline."}
     ]
     assert overview["devices"][0]["hostname"] == "WS02"
+
+
+def test_offline_file01_updates_device_counts_while_share_attention_does_not():
+    service = LabService(Inventory.load("configs/inventory.json"), Mock())
+
+    async def offline_statuses():
+        return [
+            {"hostname": "FILE01", "device_type": "file_server", "status": "offline", "service_health": "unavailable", "dependency_status": "normal", "live": {"message": "FILE01 is offline."}},
+            {"hostname": "WS01", "device_type": "workstation", "status": "online", "service_health": "available", "dependency_status": "normal"},
+        ]
+
+    service.all_device_statuses = offline_statuses
+    offline = asyncio.run(service.overview())
+    assert offline["online_devices"] == 1
+    assert offline["offline_devices"] == 1
+
+    async def share_attention_statuses():
+        return [
+            {"hostname": "FILE01", "device_type": "file_server", "status": "online", "service_health": "attention", "dependency_status": "normal", "live": {"last_event": "Finance share disabled."}},
+            {"hostname": "WS01", "device_type": "workstation", "status": "online", "service_health": "available", "dependency_status": "normal"},
+        ]
+
+    service.all_device_statuses = share_attention_statuses
+    share_attention = asyncio.run(service.overview())
+    assert share_attention["online_devices"] == 2
+    assert share_attention["offline_devices"] == 0
+    assert share_attention["services_requiring_attention"] == 1

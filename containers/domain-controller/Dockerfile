@@ -2,7 +2,7 @@ FROM debian:12-slim
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    dnsutils iproute2 python3 samba samba-ad-provision samba-dsdb-modules \
+    dnsutils iproute2 iputils-ping python3 samba samba-ad-provision samba-dsdb-modules \
     samba-vfs-modules smbclient winbind \
   && rm -rf /var/lib/apt/lists/*
 

@@ -724,9 +724,32 @@ event feed. The Systems page, topology, device drawer, share inventory, and
 controlled access checker expose this state without arbitrary paths or command
 execution.
 
-Phase 10 will add the user-facing remediation controls for restoring FILE01,
-starting SMB, re-enabling shares, repairing access membership, and restoring
-write access. Phase 9 deliberately does not provide that repair UI.
+Phase 10 adds contextual remediation controls to the existing FILE01 drawer.
+Only active failures surface a repair: an offline server can be brought online,
+a stopped SMB service can be restarted, a disabled known share can be
+re-enabled, and a read-only share can have expected write access restored.
+The same drawer exposes controlled fault actions while healthy: FILE01 can be
+set offline, SMB can be stopped, and each configured share can be disabled.
+Restoring FILE01 also reinstalls its `10.10.0.0/16` return route through
+`10.10.40.1`, because Linux removes that static route when `eth1` is lowered.
+The backend exposes constrained recovery routes under `/api/fileserver/actions`
+and `/api/fileserver/shares/{share}`. Results include the action, target,
+previous/new state, whether anything changed, a message, and resolution time.
+The supported routes are `POST /api/fileserver/actions/online`,
+`POST /api/fileserver/actions/restart-service`,
+`POST /api/fileserver/shares/{share}/enable`, and
+`POST /api/fileserver/shares/{share}/restore-write`. Existing
+`POST /api/fileserver/shares/{share}/memberships` operations remain the only
+way to restore group-derived user access.
+The existing event feed records successful state-changing recovery actions,
+and normal lab refreshes update device counts, topology, Systems, service
+attention, and FILE01 detail state.
+
+Access recovery continues to use the Phase 9.5 user → AD group → FILE01 share
+model. A membership-related denial now links to the existing Manage Access
+drawer; no direct user-to-share permission state exists. Phase 10 does not add
+permission-refresh or DNS repair controls because Phase 9 introduced no stale
+permission cache or FILE01 DNS fault state.
 
 Phase 9.5 adds Manage Access to each FILE01 share without introducing direct
 share-user assignments. The drawer derives effective users from current DC01
@@ -738,6 +761,38 @@ The authoritative relationship remains user → AD security group → share
 permission, and the existing event feed records each membership change.
 
 ## Ticketing and IT Operations Direction
+
+## Phase 11 Monitoring and Alerts
+
+Phase 11 preserves the existing live health cards, attention drawers, device
+status evaluation, event feed, fault injection, and remediation workflows. It
+adds a lightweight in-memory alert lifecycle derived from those same live
+device, FILE01, printer, and Active Directory states. No separate source of
+truth or hardcoded alert feed is used.
+
+Each active condition has one stable alert record with a source, source type,
+severity, summary, detected time, status, and related device, account, service,
+or share. Repeated polling updates that record instead of creating duplicates.
+When the underlying condition recovers, the alert automatically becomes
+resolved and receives a resolution timestamp. A later recurrence creates a new
+record while the earlier resolution remains in the bounded history. Like the
+existing recent-event feed, this history is intentionally ephemeral and resets
+when the backend restarts.
+
+Critical severity covers required infrastructure servers and routing devices
+that are unavailable. Warning covers endpoint or printer outages, upstream
+connectivity impacts, stopped SMB, disabled shares, and locked, disabled, or
+password-expired directory accounts. Notice is available for lower-severity
+conditions such as a read-only share. The combined operational-health summary
+counts active critical, warning, notice, and account-attention alerts.
+
+The Dashboard continues to use its established compact layout and shows one
+additional operational alert strip only when active alerts exist. The
+Monitoring intentionally shows only active operational alerts, leaving
+historical incident ownership to the future ticketing workflow. Alert rows
+link back to existing device or directory details and recovery controls. `GET
+/api/monitoring` exposes the same read-only derived alert snapshot used by the
+overview response.
 
 The project may eventually include an IT support or operations workflow.
 

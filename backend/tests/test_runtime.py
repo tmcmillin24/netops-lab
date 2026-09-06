@@ -25,6 +25,33 @@ def test_ping_uses_fixed_argument_list_without_shell():
     assert "shell" not in run.call_args.kwargs
 
 
+def test_known_floor_device_ping_targets_file01_office_address():
+    completed = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="64 bytes from 10.10.40.20: time=0.210 ms", stderr=""
+    )
+    source = {"id": "ws04", "hostname": "WS04", "ip_address": "10.10.20.11"}
+    destination = {"id": "file01", "hostname": "FILE01", "ip_address": "10.10.40.20"}
+
+    with patch("backend.app.services.runtime.subprocess.run", return_value=completed) as run:
+        result = DockerRuntime().ping(source, destination)
+
+    assert result["success"] is True
+    assert run.call_args.args[0] == [
+        "docker", "exec", "clab-netops-ws04", "ping", "-I", "10.10.20.11", "-c", "1", "-W", "1", "10.10.40.20"
+    ]
+
+
+def test_file01_offline_ping_returns_real_failure():
+    failed = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="1 packets transmitted, 0 packets received", stderr=""
+    )
+    source = {"id": "ws07", "hostname": "WS07", "ip_address": "10.10.30.11"}
+    destination = {"id": "file01", "hostname": "FILE01", "ip_address": "10.10.40.20"}
+    with patch("backend.app.services.runtime.subprocess.run", return_value=failed):
+        result = DockerRuntime().ping(source, destination)
+    assert result["success"] is False
+
+
 def test_infrastructure_action_uses_allowlisted_interface_without_shell():
     action_completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
     state_completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="0x1002\n", stderr="")

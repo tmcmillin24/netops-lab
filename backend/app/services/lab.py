@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import httpx
 
 from backend.app.errors import LabServiceError, UnknownDeviceError
+from backend.app.services.alerts import AlertTracker
 
 
 class LabService:
@@ -16,6 +17,7 @@ class LabService:
         self.events = []
         self.connectivity_results = {}
         self.observed_health = {}
+        self.alert_tracker = AlertTracker()
 
     def record_event(self, hostname, message, event_type):
         self.events.insert(0, {
@@ -215,7 +217,7 @@ class LabService:
         devices = await self.all_device_statuses()
         return next(device for device in devices if device["hostname"] == hostname.upper())
 
-    async def overview(self):
+    async def overview(self, account_health=None):
         devices = await self.all_device_statuses()
         self.observe_health_changes(devices)
         printers = [device for device in devices if device["device_type"] == "printer"]
@@ -241,6 +243,7 @@ class LabService:
             if device in unavailable
         ]
         jobs = sum(device.get("live", {}).get("queue", 0) for device in printers)
+        monitoring = self.alert_tracker.reconcile(devices, account_health)
         return {
             "total_devices": len(devices),
             "online_devices": len(devices) - len(unavailable),
@@ -275,6 +278,9 @@ class LabService:
             ],
             "active_print_jobs": jobs,
             "network_health": "healthy" if not unavailable and not unhealthy_services else "degraded",
+            "operational_health": "degraded" if monitoring["summary"]["active"] else "healthy",
+            "monitoring": monitoring,
+            "account_health": account_health,
             "recent_events": self.events[:15],
             "devices": devices,
         }

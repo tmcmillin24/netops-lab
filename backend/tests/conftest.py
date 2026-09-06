@@ -41,8 +41,8 @@ class FakeLabService:
     async def all_device_statuses(self):
         return [await self.device_status(device) for device in self.current_devices]
 
-    async def overview(self):
-        return {"total_devices": 17, "online_devices": 17, "offline_devices": 0, "printers_requiring_attention": 0, "printer_alerts": [], "impacted_devices": 0, "impacted_device_alerts": [], "active_print_jobs": 0, "network_health": "healthy", "recent_events": [], "devices": await self.all_device_statuses()}
+    async def overview(self, account_health=None):
+        return {"total_devices": 17, "online_devices": 17, "offline_devices": 0, "printers_requiring_attention": 0, "printer_alerts": [], "impacted_devices": 0, "impacted_device_alerts": [], "active_print_jobs": 0, "network_health": "healthy", "operational_health": "healthy", "monitoring": {"summary": {"active": 0, "critical": 0, "warning": 0, "notice": 0, "account_attention": 0}, "active_alerts": [], "resolved_alerts": [], "alerts": []}, "account_health": account_health, "recent_events": [], "devices": await self.all_device_statuses()}
 
     async def status_for_hostname(self, hostname):
         return await self.device_status(self.get_device_config(hostname))

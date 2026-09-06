@@ -2,11 +2,12 @@ from fastapi import APIRouter, Request
 
 from backend.app.errors import BackendError
 
-router = APIRouter(prefix="/api/lab", tags=["lab"])
+
+router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 
 
 @router.get("")
-async def lab_overview(request: Request):
+async def monitoring(request: Request):
     try:
         account_health = await request.app.state.ad_service.account_health()
     except BackendError:
@@ -14,4 +15,7 @@ async def lab_overview(request: Request):
             "status": "unavailable", "affected_accounts": 0,
             "affected_users": [], "status_source": "live_active_directory",
         }
-    return await request.app.state.lab_service.overview(account_health=account_health)
+    overview = await request.app.state.lab_service.overview(
+        account_health=account_health
+    )
+    return overview["monitoring"]

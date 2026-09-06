@@ -33,9 +33,18 @@ class FakeFileServerService:
         return {"allowed": True, "username": request.username, "device": request.device, "share": request.share, "operation": request.operation}
 
     async def fault(self, action, share=None):
-        if action != "service-stop":
+        if action not in {"offline", "online", "service-stop", "share-disable"}:
             raise LabServiceError("unknown_fileserver_action", "Unsupported FILE01 fault action.", 404)
-        return {"hostname": "FILE01", "smb_running": False}
+        if share is not None:
+            await self.share(share)
+        return {"hostname": "FILE01", "status": "offline" if action == "offline" else "online", "smb_running": action != "service-stop", "last_event": "State updated."}
+
+    async def remediate(self, action, share=None):
+        if action not in {"online", "restart-service", "enable-share", "restore-write"}:
+            raise LabServiceError("unknown_fileserver_remediation", "Unsupported remediation.", 404)
+        if share is not None:
+            await self.share(share)
+        return {"success": True, "changed": True, "action": action, "target": share or "FILE01", "previous_state": "unhealthy", "new_state": "healthy", "message": "Recovered.", "resolved_at": "2026-09-06T00:00:00+00:00"}
 
 
 def install_fake(client):
@@ -66,3 +75,23 @@ def test_fileserver_api_rejects_paths_commands_and_unknown_actions(client):
     assert path.status_code == command.status_code == 422
     assert action.status_code == 404
     assert unrelated_group.status_code == 422
+
+
+def test_fileserver_remediation_routes_are_constrained(client):
+    install_fake(client)
+    assert client.post("/api/fileserver/actions/online").json()["action"] == "online"
+    assert client.post("/api/fileserver/actions/restart-service").json()["action"] == "restart-service"
+    assert client.post("/api/fileserver/shares/Public/enable").status_code == 200
+    assert client.post("/api/fileserver/shares/Public/restore-write").status_code == 200
+    assert client.post("/api/fileserver/shares/Unknown/enable").status_code == 404
+    assert client.post("/api/fileserver/actions/run-command").status_code in {404, 405}
+
+
+def test_fileserver_fault_routes_support_only_known_server_and_share_actions(client):
+    install_fake(client)
+    assert client.post("/api/fileserver/faults/offline", json={}).status_code == 200
+    assert client.post("/api/fileserver/faults/online", json={}).status_code == 200
+    assert client.post("/api/fileserver/faults/service-stop", json={}).status_code == 200
+    assert client.post("/api/fileserver/faults/share-disable", json={"share": "Public"}).status_code == 200
+    assert client.post("/api/fileserver/faults/share-disable", json={"share": "Unknown"}).status_code == 404
+    assert client.post("/api/fileserver/faults/run-command", json={}).status_code == 404

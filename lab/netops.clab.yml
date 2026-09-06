@@ -39,6 +39,7 @@ topology:
         - iptables -A FORWARD -s 10.10.10.0/24 -d 10.10.40.20/32 -j ACCEPT
         - iptables -A FORWARD -s 10.10.20.0/24 -d 10.10.40.20/32 -j ACCEPT
         - iptables -A FORWARD -s 10.10.30.0/24 -d 10.10.40.20/32 -j ACCEPT
+        - iptables -A FORWARD -s 10.10.254.1/32 -d 10.10.40.20/32 -j ACCEPT
         - iptables -A FORWARD -s 10.10.40.0/24 -d 10.10.254.1/32 -j ACCEPT
 
     dc01:
