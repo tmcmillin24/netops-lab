@@ -6,12 +6,13 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from backend.app.errors import BackendError
-from backend.app.routes import active_directory, connectivity, devices, fileserver, health, lab, monitoring, printers, provisioning, workstations
+from backend.app.routes import active_directory, connectivity, devices, fileserver, health, lab, monitoring, printers, provisioning, tickets, workstations
 from backend.app.services.active_directory import ActiveDirectoryService
 from backend.app.services.fileserver import FileServerService
 from backend.app.services.lab import LabService
 from backend.app.services.runtime import DockerRuntime
 from backend.app.services.provisioning import ProvisioningService
+from backend.app.services.tickets import TicketService
 from containers.common.inventory import Inventory
 
 INVENTORY_PATH = Path(__file__).resolve().parents[2] / "configs/inventory.json"
@@ -38,6 +39,9 @@ def create_app(lab_service=None, ad_service=None):
     )
     app.state.provisioning_service = ProvisioningService(app.state.lab_service, app.state.ad_service)
     app.state.fileserver_service = FileServerService(app.state.lab_service, app.state.ad_service)
+    app.state.ticket_service = TicketService(
+        app.state.lab_service, app.state.ad_service, app.state.fileserver_service
+    )
 
     @app.exception_handler(BackendError)
     async def backend_error_handler(request: Request, error: BackendError):
@@ -69,6 +73,7 @@ def create_app(lab_service=None, ad_service=None):
     app.include_router(active_directory.router)
     app.include_router(fileserver.router)
     app.include_router(provisioning.router)
+    app.include_router(tickets.router)
     return app
 
 

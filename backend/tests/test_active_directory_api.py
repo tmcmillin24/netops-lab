@@ -33,3 +33,9 @@ def test_password_reset_and_membership_routes(client):
     assert reset.status_code == 200
     assert reset.json()["temporary_password"] == "temporary-value"
     assert membership.status_code == 200
+
+
+def test_enabled_directory_account_cannot_be_deleted(client):
+    response = client.delete("/api/directory/users/jordan.lee")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "account_must_be_disabled"

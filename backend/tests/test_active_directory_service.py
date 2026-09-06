@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 from backend.app.services.active_directory import ActiveDirectoryService
+from backend.app.errors import LabServiceError
 
 
 def test_account_health_counts_live_states_without_double_counting_users():
@@ -29,3 +31,31 @@ def test_account_health_counts_live_states_without_double_counting_users():
     assert len(result["affected_users"]) == 4
     assert next(user for user in result["affected_users"] if user["username"] == "two_issues")["issues"] == ["Locked", "Password expired"]
     assert result["status_source"] == "live_active_directory"
+
+
+def test_disabled_unassigned_account_can_be_deleted_and_stays_removed(tmp_path, monkeypatch):
+    extension_file = tmp_path / "lab_extensions.json"
+    extension_file.write_text(json.dumps({"users": [], "deleted_users": []}))
+    monkeypatch.setenv("LAB_EXTENSIONS_PATH", str(extension_file))
+    service = ActiveDirectoryService(runtime=None)
+    deleted = []
+
+    async def get_user(username):
+        return {"username": username, "enabled": False, "workstation": None}
+
+    async def delete_user(username):
+        deleted.append(username)
+
+    service.get_user = get_user
+    service.delete_user = delete_user
+    result = asyncio.run(service.delete_disabled_user("taylor.brooks"))
+
+    assert result == {"username": "taylor.brooks", "deleted": True}
+    assert deleted == ["taylor.brooks"]
+    assert "taylor.brooks" in json.loads(extension_file.read_text())["deleted_users"]
+    try:
+        service.known_user("taylor.brooks")
+    except LabServiceError as error:
+        assert error.code == "unknown_directory_user"
+    else:
+        raise AssertionError("Deleted baseline user was reloaded")

@@ -62,3 +62,19 @@ class FileShareMembershipRequest(StrictRequest):
     username: str = Field(min_length=3, max_length=32, pattern=r"^[a-z][a-z0-9.]+$")
     group: str = Field(min_length=2, max_length=32, pattern=r"^[A-Za-z][A-Za-z0-9-]*$")
     action: Literal["add", "remove"]
+
+
+class TicketGenerateRequest(StrictRequest):
+    difficulty: Literal["easy", "medium", "hard"]
+
+
+class TicketBatchGenerateRequest(TicketGenerateRequest):
+    count: int = Field(ge=1, le=5)
+
+
+class TicketStartRequest(StrictRequest):
+    technician: str = Field(min_length=2, max_length=48)
+
+
+class TicketResolveRequest(TicketStartRequest):
+    resolution_notes: str = Field(min_length=2, max_length=500)

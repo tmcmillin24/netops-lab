@@ -29,6 +29,11 @@ async def get_user(username: str, request: Request):
     return await request.app.state.ad_service.get_user(username)
 
 
+@router.delete("/users/{username}")
+async def delete_user(username: str, request: Request):
+    return await request.app.state.ad_service.delete_disabled_user(username)
+
+
 @router.post("/users/{username}/actions/{action}")
 async def user_action(username: str, action: str, request: Request):
     return await request.app.state.ad_service.user_action(username, action)

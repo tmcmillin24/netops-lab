@@ -100,6 +100,25 @@ nav { display: grid; gap: 4px; padding-top: 20px; }
 .monitoring-table { max-height: 510px; overflow: auto; overscroll-behavior: contain; }
 .monitoring-table tbody tr[data-alert-device], .monitoring-table tbody tr[data-alert-user] { cursor: pointer; }
 .monitoring-table tbody tr[data-alert-device]:hover, .monitoring-table tbody tr[data-alert-user]:hover { background: #f7f9fa; }
+.ticket-generator { display: grid; grid-template-columns: minmax(260px, 1fr) auto auto auto; align-items: center; gap: 18px; margin-bottom: 14px; padding: 16px 18px; }
+.ticket-generator h3 { margin: 0; font-size: 14px; }
+.ticket-generator p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.difficulty-picker, .ticket-filters { display: flex; gap: 6px; }
+.difficulty-picker button, .ticket-filters button { padding: 8px 11px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--muted); font-size: 10px; font-weight: 700; }
+.difficulty-picker button.active, .ticket-filters button.active { border-color: #86adca; background: var(--blue-soft); color: var(--blue); }
+.ticket-count { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.ticket-count select { width: 54px; padding: 7px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font: inherit; }
+.ticket-filters { margin-bottom: 11px; }
+.ticket-filters button { display: flex; align-items: center; gap: 7px; }
+.ticket-filters small { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 9px; background: #e5ebee; font-size: 8px; }
+.ticket-table { max-height: 470px; overflow: auto; overscroll-behavior: contain; }
+.ticket-table tbody tr[data-ticket] { cursor: pointer; }
+.ticket-table tbody tr[data-ticket]:hover { background: #f7f9fa; }
+.ticket-investigation { display: grid; gap: 8px; margin-bottom: 15px; padding: 11px; border-radius: 7px; background: #f3f7fa; }
+.ticket-investigation > strong { font-size: 11px; }
+.ticket-investigation > span { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.ticket-investigation .terminal-result { margin-top: 4px; }
+textarea { width: 100%; resize: vertical; padding: 9px 10px; border: 1px solid #cbd6dd; border-radius: 6px; color: var(--ink); font: inherit; }
 .loading-state, .empty-state { padding: 70px 20px; color: var(--muted); text-align: center; }
 .loading-state strong, .empty-state strong { display: block; margin-bottom: 6px; color: var(--ink); }
 .loading-state.compact { padding: 35px 18px; }
@@ -305,6 +324,7 @@ tbody tr:hover { background: #f5f9fc; }
   .metric-grid { grid-template-columns: repeat(3, 1fr); }
   .network-layout, .dashboard-grid { grid-template-columns: 1fr; }
   .monitoring-summary { grid-template-columns: repeat(3, 1fr); }
+  .ticket-generator { grid-template-columns: 1fr; }
   .directory-summary { grid-template-columns: repeat(2, 1fr); }
   .diagnostic-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .diagnostic-panel h3, .diagnostic-panel > p, .diagnostic-result { grid-column: 1 / -1; }

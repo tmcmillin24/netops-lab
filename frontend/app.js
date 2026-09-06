@@ -1,4 +1,4 @@
-import {api, ApiError} from "./api.js?v=phase11-cleanup";
+import {api, ApiError} from "./api.js?v=phase12-tasks";
 
 const state = {
   page: "dashboard",
@@ -8,6 +8,11 @@ const state = {
   directoryHealth: null,
   directoryLoading: false,
   directoryView: "users",
+  tickets: [],
+  ticketFilter: "open",
+  ticketDifficulty: "easy",
+  ticketCount: 1,
+  ticketsLoading: false,
   connected: false,
   selectedDevice: null,
   selectedDirectoryUser: null,
@@ -286,7 +291,7 @@ function openDirectoryUser(username) {
     : `<section class="drawer-section account-recovery"><div class="account-state-clear"><strong>Account is operational</strong><span>No account-state recovery is currently required.</span></div></section>`;
   const administrativeActions = user.enabled
     ? `${user.password_expired ? "" : `<button class="action-button warning" data-ad-reset="${user.username}">Reset password</button>`}<button class="action-button danger" data-ad-action="disable" data-ad-user="${user.username}">Disable account</button>`
-    : "";
+    : `<button class="action-button danger" data-delete-ad-user="${user.username}" ${user.workstation ? "disabled" : ""}>Delete account</button>`;
   document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><div class="drawer-header-row"><div><h2>${escapeHtml(user.display_name)}</h2><p>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p></div>${badge(currentStatus)}</div></header>${recoverySection}<div id="actionFeedback" class="action-feedback directory-action-feedback"></div><section class="drawer-section"><h3>Organization</h3><div class="facts">${fact("Department", user.department)}${fact("Floor", user.floor)}${fact("Assigned workstation", user.workstation || "Unassigned")}${fact("Account type", String(user.account_type || "employee").replaceAll("_", " "))}${fact("Remote user", user.remote ? "Yes" : "No")}${fact("Privileged identity", user.privileged ? "Yes" : "No")}${fact("Domain", state.directory.domain)}</div>${user.account_type === "employee" && user.workstation ? `<button class="action-button secondary account-device-action" data-unassign-employee="${user.username}" type="button">Unassign from ${escapeHtml(user.workstation)}</button>` : user.account_type === "employee" && user.enabled ? `<button class="action-button account-device-action" data-open-assignment="${user.username}" type="button">Assign a device</button>` : ""}</section><section class="drawer-section"><h3>Account state</h3><div class="facts">${fact("Enabled", user.enabled ? "Yes" : "No")}${fact("Locked", user.locked ? "Yes" : "No")}${fact("Password expired", user.password_expired ? "Yes" : "No")}${fact("Bad password attempts", user.bad_password_count)}${fact("Groups", user.groups.join(", ") || "None")}</div></section><section class="drawer-section"><h3>File Share Access</h3><p class="section-note">Effective access from AD security-group membership.</p><div id="userFileShareAccess" class="loading-state compact"><strong>Loading FILE01 access</strong>Querying live group membership…</div></section><section class="drawer-section"><h3>Group membership</h3><div class="field"><label for="adGroup">Security group</label><select id="adGroup">${groupOptions}</select></div><button id="adGroupAction" class="action-button secondary" data-ad-membership data-ad-user="${user.username}">Update membership</button></section>${administrativeActions ? `<section class="drawer-section account-administration"><h3>Account administration</h3><p class="section-note">Routine and potentially disruptive account actions.</p><div class="action-grid">${administrativeActions}</div></section>` : ""}`;
   updateDirectoryGroupAction();
   loadDirectoryUserFileAccess(username);
@@ -444,6 +449,48 @@ function renderPlanned(page) {
   return `<section class="planned-page"><div class="planned-card"><div class="planned-icon">${icon}</div><h2>${title}</h2><p>${description}</p><span class="planned-label">Planned Phase</span></div></section>`;
 }
 
+function ticketTime(value) {
+  return value ? new Date(value).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "—";
+}
+
+function renderTickets() {
+  if (state.ticketsLoading) return loadingState("Loading tickets…");
+  const visible = state.tickets.filter(ticket => ticket.status.toLowerCase().replace(" ", "-") === state.ticketFilter);
+  const counts = Object.fromEntries(["open", "in-progress", "resolved"].map(status => [status, state.tickets.filter(ticket => ticket.status.toLowerCase().replace(" ", "-") === status).length]));
+  const rows = visible.map(ticket => `<tr data-ticket="${ticket.ticket_id}" tabindex="0"><td><strong>${ticket.ticket_id}</strong></td><td>${escapeHtml(ticket.ticket_type || "Incident")}</td><td>${escapeHtml(ticket.summary)}</td><td>${escapeHtml(ticket.affected_user || ticket.affected_object || "—")}</td><td>${ticketTime(ticket.created_at)}</td><td>${badge(ticket.status)}</td></tr>`).join("");
+  return `${pageIntro("Tickets", "Generate and work realistic incidents and service requests against the live lab.")}
+    <section class="panel ticket-generator"><div><h3>Generate Tasks</h3><p>Choose a difficulty and generate one to five live work items.</p></div><div class="difficulty-picker" role="group" aria-label="Ticket difficulty">${[["easy", "Easy"], ["medium", "Medium"], ["hard", "Hard"]].map(([value, label]) => `<button type="button" data-ticket-difficulty="${value}" class="${state.ticketDifficulty === value ? "active" : ""}">${label}</button>`).join("")}</div><label class="ticket-count">Tasks<select id="ticketCount">${[1, 2, 3, 4, 5].map(count => `<option value="${count}" ${state.ticketCount === count ? "selected" : ""}>${count}</option>`).join("")}</select></label><button class="action-button" type="button" data-generate-ticket>Generate</button><div id="ticketFeedback" class="action-feedback"></div></section>
+    <div class="ticket-filters">${[["open", "Open"], ["in-progress", "In Progress"], ["resolved", "Resolved"]].map(([value, label]) => `<button type="button" data-ticket-filter="${value}" class="${state.ticketFilter === value ? "active" : ""}">${label}<small>${counts[value]}</small></button>`).join("")}</div>
+    <section class="panel"><div class="panel-header"><div><h3>${state.ticketFilter === "in-progress" ? "In Progress" : state.ticketFilter[0].toUpperCase() + state.ticketFilter.slice(1)} tickets</h3><p>Persistent IT work items</p></div></div><div class="table-wrap ticket-table"><table><thead><tr><th>ID</th><th>Type</th><th>Summary</th><th>Affected</th><th>Created</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No tickets in this queue.</td></tr>'}</tbody></table></div></section>`;
+}
+
+async function loadTickets() {
+  state.ticketsLoading = true;
+  try {
+    state.tickets = (await api.tickets()).tickets;
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    state.ticketsLoading = false;
+  }
+}
+
+function openTicket(ticketId) {
+  const ticket = state.tickets.find(item => item.ticket_id === ticketId);
+  if (!ticket) return;
+  state.selectedDevice = null;
+  document.getElementById("deviceDrawer").classList.add("open");
+  document.getElementById("deviceDrawer").setAttribute("aria-hidden", "false");
+  document.getElementById("drawerBackdrop").hidden = false;
+  const duration = ticket.time_to_resolution_seconds === null ? "—" : `${Math.floor(ticket.time_to_resolution_seconds / 60)}m ${ticket.time_to_resolution_seconds % 60}s`;
+  const workControls = ticket.status === "Open"
+    ? `<div class="field"><label for="ticketTechnician">Assigned technician</label><input id="ticketTechnician" value="Avery Admin" maxlength="48"></div><button class="action-button" type="button" data-start-ticket="${ticket.ticket_id}">Start work</button>`
+    : ticket.status === "In Progress"
+      ? `<div class="ticket-investigation"><strong>Investigation tools</strong><span>Ping confirms network reachability. Recovery verification checks the ticket's actual technical condition.</span><div class="action-grid">${ticket.affected_user && ticket.affected_object.startsWith("FILE01") ? `<button class="action-button secondary" type="button" data-ticket-file-ping="${ticket.ticket_id}">Test FILE01 reachability</button>` : ""}<button class="action-button secondary" type="button" data-verify-ticket="${ticket.ticket_id}">Verify current recovery</button></div><div id="ticketInvestigationResult"></div></div><div class="field"><label for="ticketTechnician">Assigned technician</label><input id="ticketTechnician" value="${escapeHtml(ticket.assigned_technician)}" maxlength="48"></div><div class="field"><label for="ticketResolutionNotes">Resolution notes</label><textarea id="ticketResolutionNotes" maxlength="500" rows="4" placeholder="Describe the repair and verification performed."></textarea></div><button class="action-button" type="button" data-resolve-ticket="${ticket.ticket_id}">Verify and resolve</button>`
+      : `<div class="facts">${fact("Resolved", ticketTime(ticket.resolved_at))}${fact("Time to resolution", duration)}${fact("Technician", ticket.assigned_technician)}${fact("Resolution notes", ticket.resolution_notes)}</div>`;
+  document.getElementById("drawerContent").innerHTML = `<header class="drawer-header"><div class="drawer-header-row"><div><p>${escapeHtml(ticket.ticket_type || "Incident")}</p><h2>${ticket.ticket_id}</h2></div>${badge(ticket.status)}</div></header><section class="drawer-section"><h3>${escapeHtml(ticket.summary)}</h3><div class="event-box">${escapeHtml(ticket.description)}</div></section><section class="drawer-section"><h3>Ticket details</h3><div class="facts">${fact("Affected user", ticket.affected_user || "Not specified")}${fact("Affected object", ticket.affected_object)}${fact("Created", ticketTime(ticket.created_at))}${fact("Assigned technician", ticket.assigned_technician)}</div></section><section class="drawer-section"><h3>${ticket.status === "Resolved" ? "Resolution" : "Work ticket"}</h3>${workControls}<div id="actionFeedback" class="action-feedback"></div></section>`;
+}
+
 function renderArchitecture() {
   return `${pageIntro("Current architecture", "How the browser reaches real containerized infrastructure while preserving a safe control boundary.")}
     <section class="panel"><div class="panel-header"><div><h3>Runtime and data flow</h3><p>Current local development architecture</p></div></div><div class="architecture-flow">
@@ -465,7 +512,7 @@ function architectureNode(title, description) {
 
 function renderPage() {
   document.getElementById("pageTitle").textContent = pageTitles[state.page];
-  const renderers = {dashboard: renderDashboard, network: renderNetwork, systems: renderSystems, "active-directory": renderActiveDirectory, monitoring: renderMonitoring, architecture: renderArchitecture};
+  const renderers = {dashboard: renderDashboard, network: renderNetwork, systems: renderSystems, "active-directory": renderActiveDirectory, monitoring: renderMonitoring, tickets: renderTickets, architecture: renderArchitecture};
   content.innerHTML = renderers[state.page] ? renderers[state.page]() : renderPlanned(state.page);
 }
 
@@ -638,10 +685,11 @@ async function loadData(force = false) {
     const preserveInteractivePage = !force && (
       (state.page === "network" && state.diagnosticsActive) || state.page === "active-directory"
     );
-    if (!preserveInteractivePage) {
-      renderPage();
-      if (state.selectedDevice && !state.fileAccessShare) renderDrawer();
-    }
+    const preserveOpenDrawer = !force
+      && state.selectedDevice
+      && document.getElementById("deviceDrawer").classList.contains("open");
+    if (!preserveInteractivePage) renderPage();
+    if (state.selectedDevice && !state.fileAccessShare && !preserveOpenDrawer) renderDrawer();
   } catch (error) {
     state.loading = false;
     state.overview = null;
@@ -844,6 +892,96 @@ document.addEventListener("click", async event => {
     content.focus();
     return;
   }
+  const ticketDifficulty = event.target.closest("[data-ticket-difficulty]");
+  if (ticketDifficulty) {
+    state.ticketDifficulty = ticketDifficulty.dataset.ticketDifficulty;
+    renderPage();
+    return;
+  }
+  const ticketFilter = event.target.closest("[data-ticket-filter]");
+  if (ticketFilter) {
+    state.ticketFilter = ticketFilter.dataset.ticketFilter;
+    renderPage();
+    return;
+  }
+  const generateTicket = event.target.closest("[data-generate-ticket]");
+  if (generateTicket) {
+    generateTicket.disabled = true;
+    generateTicket.textContent = "Applying scenario…";
+    try {
+      const result = await api.generateTickets(state.ticketDifficulty, state.ticketCount);
+      await Promise.all([loadTickets(), loadData(true)]);
+      state.ticketFilter = "open";
+      renderPage();
+      showToast(`${result.tickets.length} ${result.tickets.length === 1 ? "task" : "tasks"} generated.`);
+      if (result.tickets.length === 1) openTicket(result.tickets[0].ticket_id);
+    } catch (error) {
+      showActionError(error);
+      const feedback = document.getElementById("ticketFeedback");
+      if (feedback) feedback.innerHTML = `<div class="diagnostic-result error">${escapeHtml(error.message)}</div>`;
+    }
+    return;
+  }
+  const ticketRow = event.target.closest("[data-ticket]");
+  if (ticketRow) return openTicket(ticketRow.dataset.ticket);
+  const startTicket = event.target.closest("[data-start-ticket]");
+  if (startTicket) {
+    startTicket.disabled = true;
+    try {
+      const ticket = await api.startTicket(startTicket.dataset.startTicket, document.getElementById("ticketTechnician").value);
+      await loadTickets();
+      renderPage();
+      openTicket(ticket.ticket_id);
+      showToast(`${ticket.ticket_id} is now In Progress.`);
+    } catch (error) { showActionError(error); }
+    return;
+  }
+  const resolveTicket = event.target.closest("[data-resolve-ticket]");
+  if (resolveTicket) {
+    resolveTicket.disabled = true;
+    resolveTicket.textContent = "Verifying recovery…";
+    try {
+      const ticket = await api.resolveTicket(resolveTicket.dataset.resolveTicket, document.getElementById("ticketTechnician").value, document.getElementById("ticketResolutionNotes").value);
+      await Promise.all([loadTickets(), loadData(true)]);
+      state.ticketFilter = "resolved";
+      renderPage();
+      openTicket(ticket.ticket_id);
+      showToast(`${ticket.ticket_id} resolved.`);
+    } catch (error) {
+      resolveTicket.disabled = false;
+      resolveTicket.textContent = "Verify and resolve";
+      showActionError(error);
+    }
+    return;
+  }
+  const ticketFilePing = event.target.closest("[data-ticket-file-ping]");
+  if (ticketFilePing) {
+    ticketFilePing.disabled = true;
+    ticketFilePing.textContent = "Testing…";
+    try {
+      const result = await api.ticketFileConnectivity(ticketFilePing.dataset.ticketFilePing);
+      document.getElementById("ticketInvestigationResult").innerHTML = diagnosticTranscript({...result, diagnostic_type: "ping"});
+    } catch (error) { showActionError(error); }
+    finally {
+      ticketFilePing.disabled = false;
+      ticketFilePing.textContent = "Test FILE01 reachability";
+    }
+    return;
+  }
+  const verifyTicket = event.target.closest("[data-verify-ticket]");
+  if (verifyTicket) {
+    verifyTicket.disabled = true;
+    verifyTicket.textContent = "Verifying…";
+    try {
+      const result = await api.verifyTicket(verifyTicket.dataset.verifyTicket);
+      document.getElementById("ticketInvestigationResult").innerHTML = `<div class="diagnostic-result ${result.recovered ? "success" : "error"}"><strong>${result.recovered ? "RECOVERY VERIFIED" : "ISSUE STILL DETECTED"}</strong><span>${escapeHtml(result.message)}</span></div>`;
+    } catch (error) { showActionError(error); }
+    finally {
+      verifyTicket.disabled = false;
+      verifyTicket.textContent = "Verify current recovery";
+    }
+    return;
+  }
   const alertDevice = event.target.closest("[data-alert-device]");
   if (alertDevice) return openDrawer(alertDevice.dataset.alertDevice);
   const alertUser = event.target.closest("[data-alert-user]");
@@ -856,6 +994,9 @@ document.addEventListener("click", async event => {
     renderPage();
     if (state.page === "active-directory") {
       await loadDirectory();
+      renderPage();
+    } else if (state.page === "tickets") {
+      await loadTickets();
       renderPage();
     }
     content.focus();
@@ -901,6 +1042,25 @@ document.addEventListener("click", async event => {
     } catch (error) {
       button.disabled = false;
       button.textContent = originalLabel;
+      showActionError(error);
+    }
+    return;
+  }
+  if (event.target.dataset.deleteAdUser) {
+    const username = event.target.dataset.deleteAdUser;
+    if (!window.confirm(`Permanently delete ${username}? This cannot be undone.`)) return;
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = "Deleting…";
+    try {
+      await api.deleteDirectoryUser(username);
+      closeDrawer();
+      await Promise.all([loadDirectory(), loadData(true)]);
+      renderPage();
+      showToast(`${username}: account deleted.`);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "Delete account";
       showActionError(error);
     }
     return;
@@ -1006,6 +1166,10 @@ document.addEventListener("click", async event => {
 });
 
 document.addEventListener("change", event => {
+  if (event.target.id === "ticketCount") {
+    state.ticketCount = Number(event.target.value);
+    return;
+  }
   if (event.target.id === "adGroup") {
     updateDirectoryGroupAction();
     return;

@@ -12,6 +12,15 @@ def test_monitoring_exposes_live_alert_summary(client):
     assert response.json()["active_alerts"] == []
 
 
+def test_ticket_queue_starts_empty_and_rejects_unknown_ticket(client):
+    listing = client.get("/api/tickets")
+    missing = client.get("/api/tickets/INC-9999")
+
+    assert listing.status_code == 200
+    assert listing.json() == {"tickets": []}
+    assert missing.status_code == 404
+
+
 def test_lab_overview(client):
     response = client.get("/api/lab")
     assert response.status_code == 200

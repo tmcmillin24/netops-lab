@@ -48,6 +48,11 @@ class ActiveDirectoryService:
         if extension_file.exists():
             extensions = json.loads(extension_file.read_text())
             self.baseline["users"].extend(extensions.get("users", []))
+            deleted_users = {name.lower() for name in extensions.get("deleted_users", [])}
+            self.baseline["users"] = [
+                user for user in self.baseline["users"]
+                if user["username"].lower() not in deleted_users
+            ]
             workstation_overrides = extensions.get("user_workstation_overrides", {})
             profile_overrides = extensions.get("user_profile_overrides", {})
             for user in self.baseline["users"]:
@@ -97,6 +102,39 @@ class ActiveDirectoryService:
 
     async def delete_user(self, username):
         await self.command("samba-tool", "user", "delete", username)
+
+    async def delete_disabled_user(self, username):
+        config = self.known_user(username)
+        user = await self.get_user(config["username"])
+        if user["enabled"]:
+            raise LabServiceError(
+                "account_must_be_disabled",
+                "Disable the account before deleting it.", 409,
+            )
+        if user.get("workstation"):
+            raise LabServiceError(
+                "account_device_assigned",
+                "Unassign the account from its device before deleting it.", 409,
+            )
+        await self.delete_user(config["username"])
+        extension_file = extensions_path()
+        extensions = json.loads(extension_file.read_text()) if extension_file.exists() else {}
+        extensions["users"] = [
+            item for item in extensions.get("users", [])
+            if item["username"].lower() != config["username"].lower()
+        ]
+        for key in ("user_workstation_overrides", "user_profile_overrides"):
+            extensions.setdefault(key, {}).pop(config["username"], None)
+        deleted = set(extensions.get("deleted_users", []))
+        deleted.add(config["username"])
+        extensions["deleted_users"] = sorted(deleted)
+        extension_file.parent.mkdir(parents=True, exist_ok=True)
+        temporary = extension_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps(extensions, indent=2) + "\n")
+        temporary.replace(extension_file)
+        self.reload_baseline()
+        self.record_event(f"{config['username']} account permanently deleted.", "warning")
+        return {"username": config["username"], "deleted": True}
 
     async def delete_computer(self, hostname):
         await self.command("samba-tool", "computer", "delete", hostname)

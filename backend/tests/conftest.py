@@ -149,6 +149,14 @@ class FakeActiveDirectoryService:
         await self.get_user(username)
         return {"username": username, "temporary_password": "temporary-value", "message": "Temporary lab password generated. It will not be shown again."}
 
+    async def delete_disabled_user(self, username):
+        user = await self.get_user(username)
+        if user["enabled"]:
+            raise LabServiceError("account_must_be_disabled", "Disable the account before deleting it.", 409)
+        if user.get("workstation"):
+            raise LabServiceError("account_device_assigned", "Unassign the account from its device before deleting it.", 409)
+        return {"username": username, "deleted": True}
+
     async def membership_action(self, username, group_name, action):
         await self.get_user(username)
         if group_name != "Finance":
@@ -172,6 +180,7 @@ def service():
 
 @pytest.fixture(autouse=True)
 def isolated_provisioning_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("NETOPS_STATE_DIR", str(tmp_path))
     extensions = tmp_path / "lab_extensions.json"
     extensions.write_text((Path(__file__).resolve().parents[2] / "configs/lab_extensions.json").read_text())
     monkeypatch.setattr(provisioning, "STATE_DIR", tmp_path)

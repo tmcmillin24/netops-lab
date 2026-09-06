@@ -762,6 +762,29 @@ permission, and the existing event feed records each membership change.
 
 ## Ticketing and IT Operations Direction
 
+Phase 12 implements a lightweight persistent incident workflow on the Tickets
+page. An operator selects Easy, Medium, or Hard and generates a compatible
+scenario that applies existing workstation, printer, FILE01, share, or Active
+Directory membership faults. Easy scenarios require one direct recovery,
+Medium scenarios require investigation across a service or access path, and
+Hard scenarios combine two related conditions. Ticket responses show only the
+reported symptom; root causes and verification checks remain in the Lima-local
+`$HOME/netops-lab-state/tickets.json` record.
+
+Tickets use sequential `INC-####` identifiers and move from Open to In Progress
+to Resolved. Resolution queries the actual current lab state and is rejected
+while any expected recovery condition remains active. Resolved tickets retain
+the technician, notes, timestamps, and elapsed resolution time. Monitoring
+continues to answer what is broken now, while Tickets retain the work and
+resolution history. Scenario generation uses only existing allowlisted actions
+and avoids resources already held by another unresolved generated ticket.
+The generator can create one to five work items per request. In addition to
+incidents, it issues state-verified service requests for access grants, endpoint
+provisioning, employee onboarding, and employee offboarding. These requests do
+not perform the requested administrative work automatically; the operator uses
+the existing Network and Active Directory controls, then ticket verification
+confirms the requested live end state.
+
 ## Phase 11 Monitoring and Alerts
 
 Phase 11 preserves the existing live health cards, attention drawers, device
